@@ -29,7 +29,8 @@ module ActiverecordBatch
 
     # Handles lazy loading of associations with thread safety
     class AggregationLoader
-      def initialize(records)
+      def initialize(relation, records)
+        @relation = relation
         @records = records
         @loaded_data = {}
         @primary_key = records.first.class.primary_key
@@ -49,8 +50,8 @@ module ActiverecordBatch
       private
 
       def load_association_count(reflection, conditions, cache_key)
-        record_ids = @records.map(&@primary_key.to_sym)
-        query = reflection.klass.where(reflection.foreign_key => record_ids)
+        subquery = @relation.select(@primary_key)
+        query = reflection.klass.where(reflection.foreign_key => subquery)
         query = query.where(conditions) if conditions.present?
         @loaded_data[cache_key] = query.group(reflection.foreign_key).count
       end
@@ -71,7 +72,7 @@ module ActiverecordBatch
 
       def exec_queries
         records = super
-        setup_eager_aggregation(records) if should_eager_aggregate?(records)
+        setup_eager_aggregation(self, records) if should_eager_aggregate?(records)
         records
       end
 
@@ -79,8 +80,8 @@ module ActiverecordBatch
         instance_variable_defined?(:@perform_eager_aggregation) && !records.empty?
       end
 
-      def setup_eager_aggregation(records)
-        loader = AggregationLoader.new(records)
+      def setup_eager_aggregation(relation, records)
+        loader = AggregationLoader.new(relation, records)
 
         records.each do |record|
           has_many_associations(record).each do |reflection|
