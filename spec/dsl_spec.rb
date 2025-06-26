@@ -158,6 +158,30 @@ RSpec.describe "DSL" do
     end.not_to exceed_query_limit(3)
   end
 
+  it "handles eager count with a scope" do
+    5.times do |i|
+      user = User.create!(name: "User #{i}", role: "author", verified: true)
+      5.times { |j| user.posts.create!(title: j.even? ? "Even" : "Odd") }
+    end
+    5.times do |i|
+      user = User.create!(name: "User #{i}", role: "author", verified: false)
+      5.times { |j| user.posts.create!(title: j.even? ? "Even" : "Odd") }
+    end
+    5.times do |i|
+      user = User.create!(name: "User #{i}", role: "not_author", verified: true)
+      5.times { |j| user.posts.create!(title: j.even? ? "Even" : "Odd") }
+    end
+
+    expect do
+      users = User.active_authors.eager
+      expect(users.size).to eq(5)
+      users.each do |user|
+        even_posts_count = user.posts.where(title: "Even").count
+        expect(even_posts_count).to eq(3)
+      end
+    end.not_to exceed_query_limit(3)
+  end
+
   it "does not break nested aggregations without eager" do
     # Create categories
     tech_category = Category.create!(name: "Technology", active: true)
