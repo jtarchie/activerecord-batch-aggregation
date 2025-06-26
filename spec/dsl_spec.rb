@@ -42,7 +42,7 @@ RSpec.describe "DSL" do
     expect(User.where(name: "User 1").count).to eq(1)
   end
 
-  it "handles eager aggregation" do
+  it "handles eager count aggregation" do
     10.times do |i|
       user = User.create!(name: "User #{i}", age: rand(1..100))
       10.times { |j| user.posts.create!(title: "Post #{j}") }
@@ -51,6 +51,22 @@ RSpec.describe "DSL" do
     expect do
       scope = User.eager.all
       expect(scope.size).to eq(10)
+
+      scope.each do |user|
+        expect(user.posts.count).to eq(10)
+      end
+    end.not_to exceed_query_limit(3)
+  end
+
+  it "handles eager count aggregation with where clause" do
+    10.times do |i|
+      user = User.create!(name: "User #{i}", age: i.even? ? 30 : 60) # Alternate ages for testing
+      10.times { |j| user.posts.create!(title: "Post #{j}") }
+    end
+
+    expect do
+      scope = User.eager.where(age: 30..50)
+      expect(scope.size).to eq(5) # Adjust based on created users' ages
 
       scope.each do |user|
         expect(user.posts.count).to eq(10)
