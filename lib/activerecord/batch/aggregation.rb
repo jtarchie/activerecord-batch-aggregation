@@ -8,6 +8,71 @@ module ActiverecordBatch
   module Aggregation
     class Error < StandardError; end
 
+    class AggregationProxy
+      def initialize(loader, record, reflection)
+        @loader = loader
+        @record = record
+        @reflection = reflection
+        @associated_records = nil
+      end
+
+      def count(*_args, &)
+        associated_records.count
+      end
+
+      def where(conditions)
+        filtered_records = associated_records.select do |assoc_record|
+          conditions.all? { |key, value| assoc_record.public_send(key) == value }
+        end
+
+        result = Object.new
+        result.define_singleton_method(:count) do
+          filtered_records.count
+        end
+        result
+      end
+
+      private
+
+      def associated_records
+        @associated_records ||= @loader.get_associated_records(@record, @reflection)
+      end
+    end
+
+    class AggregationLoader
+      def initialize(records)
+        @records = records
+        @loaded_data = {}
+        @klass = records.first.class
+        @primary_key = @klass.primary_key
+        @lock = Mutex.new
+      end
+
+      def proxy_for(record, reflection)
+        AggregationProxy.new(self, record, reflection)
+      end
+
+      def get_associated_records(record, reflection)
+        @lock.synchronize do
+          load_association(reflection) unless @loaded_data.key?(reflection.name)
+        end
+
+        pk_value = record.public_send(@primary_key)
+        @loaded_data.dig(reflection.name, pk_value) || []
+      end
+
+      private
+
+      def load_association(reflection)
+        foreign_key = reflection.foreign_key
+        assoc_klass = reflection.klass
+        record_ids = @records.map(&@primary_key.to_sym)
+
+        all_associated_records = assoc_klass.where(foreign_key => record_ids).to_a
+        @loaded_data[reflection.name] = all_associated_records.group_by(&foreign_key.to_sym)
+      end
+    end
+
     module ModelMethods
       def eager
         all.eager
@@ -28,46 +93,18 @@ module ActiverecordBatch
       def exec_queries
         records = super
 
-        # This implementation is updated to handle basic `where` conditions on associations.
-        # It remains specific to the User/Post test case for now.
-        if instance_variable_defined?(:@perform_eager_aggregation) && klass.name == "User" && !records.empty?
-          association_name = :posts
-          reflection = klass.reflect_on_association(association_name)
-          foreign_key = reflection.foreign_key
-          primary_key = klass.primary_key
-
-          record_ids = records.map(&primary_key.to_sym)
-
-          # Eager load all associated records to handle queries in memory.
-          # This uses more memory than just fetching counts but is necessary
-          # to support filtering with `where`.
-          all_associated_records = reflection.klass.where(foreign_key => record_ids).to_a
-          records_by_fk = all_associated_records.group_by(&foreign_key.to_sym)
+        if instance_variable_defined?(:@perform_eager_aggregation) && !records.empty?
+          loader = AggregationLoader.new(records)
 
           records.each do |record|
-            primary_key_value = record.public_send(primary_key)
-            associated_records_for_record = records_by_fk[primary_key_value] || []
-            proxy = record.public_send(association_name)
+            record.class.reflect_on_all_associations(:has_many).each do |reflection|
+              next if reflection.options[:through]
 
-            # Override methods on the association proxy to use the preloaded records.
-            # This avoids N+1 queries for `count` and `where(...).count` calls.
-            proxy.define_singleton_method(:count) do |*args, &block|
-              associated_records_for_record.count(*args, &block)
-            end
+              association_name = reflection.name
 
-            proxy.define_singleton_method(:where) do |conditions|
-              # This is a basic implementation of `where` that works on the loaded array.
-              # It only supports equality checks from a hash.
-              filtered_records = associated_records_for_record.select do |assoc_record|
-                conditions.all? { |key, value| assoc_record.public_send(key) == value }
+              record.define_singleton_method(association_name) do
+                loader.proxy_for(self, reflection)
               end
-
-              # Return a simple object that responds to `count`.
-              result = Object.new
-              result.define_singleton_method(:count) do |*args, &block|
-                filtered_records.count(*args, &block)
-              end
-              result
             end
           end
         end
