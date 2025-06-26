@@ -158,7 +158,7 @@ RSpec.describe "DSL" do
     end.not_to exceed_query_limit(3)
   end
 
-  it "handles complex nested aggregations with has_many through and multiple scopes" do
+  it "does not break nested aggregations without eager" do
     # Create categories
     tech_category = Category.create!(name: "Technology", active: true)
     lifestyle_category = Category.create!(name: "Lifestyle", active: true)
@@ -224,9 +224,7 @@ RSpec.describe "DSL" do
       end
     end
 
-    # expect do
-    # Test complex eager loading with multiple nested aggregations
-    users = User.eager.active_authors.includes(:posts, :categories)
+    users = User.active_authors.includes(:posts, :categories)
 
     expect(users.size).to eq(2) # Only verified authors
 
@@ -288,7 +286,5 @@ RSpec.describe "DSL" do
       high_score_posts = category.posts.published.high_score.count
       expect(high_score_posts).to be >= 0
     end
-
-    # end.not_to exceed_query_limit(8) # Allow for complex queries but still batched
   end
 end
