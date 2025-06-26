@@ -25,6 +25,7 @@ RSpec.describe "DSL" do
   with_model :Post do
     table do |t|
       t.string :title
+      t.integer :score, default: 0
       t.belongs_to :user
     end
     model do
@@ -70,6 +71,21 @@ RSpec.describe "DSL" do
 
       scope.each do |user|
         expect(user.posts.count).to eq(10)
+      end
+    end.not_to exceed_query_limit(3)
+  end
+
+  it "handles counting posts with a specific condition per user" do
+    5.times do |i|
+      user = User.create!(name: "User #{i}", age: 20 + i)
+      5.times { |j| user.posts.create!(title: j.even? ? "Even" : "Odd") }
+    end
+
+    expect do
+      users = User.eager.all
+      users.each do |user|
+        even_posts_count = user.posts.where(title: "Even").count
+        expect(even_posts_count).to eq(3)
       end
     end.not_to exceed_query_limit(3)
   end
