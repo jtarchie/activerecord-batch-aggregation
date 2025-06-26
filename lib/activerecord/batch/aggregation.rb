@@ -10,25 +10,21 @@ module ActiverecordBatch
 
     # Simple proxy that delegates count and where operations to preloaded data
     class AggregationProxy
-      def initialize(loader, record, reflection)
+      def initialize(loader, record, reflection, conditions = {})
         @loader = loader
         @record = record
         @reflection = reflection
+        @conditions = conditions
       end
 
-      def count(*) = associated_records.count
+      def count(*)
+        @loader.get_association_count(@record, @reflection, @conditions)
+      end
 
       def where(conditions)
-        filtered = associated_records.select do |record|
-          conditions.all? { |key, value| record.public_send(key) == value }
-        end
-
-        Object.new.tap { |obj| obj.define_singleton_method(:count) { filtered.count } }
+        new_conditions = @conditions.merge(conditions)
+        self.class.new(@loader, @record, @reflection, new_conditions)
       end
-
-      private
-
-      def associated_records = @loader.get_associated_records(@record, @reflection)
     end
 
     # Handles lazy loading of associations with thread safety
@@ -42,19 +38,21 @@ module ActiverecordBatch
 
       def proxy_for(record, reflection) = AggregationProxy.new(self, record, reflection)
 
-      def get_associated_records(record, reflection)
-        @lock.synchronize { load_association(reflection) unless @loaded_data.key?(reflection.name) }
+      def get_association_count(record, reflection, conditions)
+        cache_key = [reflection.name, conditions.sort].inspect
+        @lock.synchronize { load_association_count(reflection, conditions, cache_key) unless @loaded_data.key?(cache_key) }
 
         primary_key_value = record.public_send(@primary_key)
-        @loaded_data.dig(reflection.name, primary_key_value) || []
+        @loaded_data.dig(cache_key, primary_key_value) || 0
       end
 
       private
 
-      def load_association(reflection)
+      def load_association_count(reflection, conditions, cache_key)
         record_ids = @records.map(&@primary_key.to_sym)
-        associated_records = reflection.klass.where(reflection.foreign_key => record_ids).to_a
-        @loaded_data[reflection.name] = associated_records.group_by(&reflection.foreign_key.to_sym)
+        query = reflection.klass.where(reflection.foreign_key => record_ids)
+        query = query.where(conditions) if conditions.present?
+        @loaded_data[cache_key] = query.group(reflection.foreign_key).count
       end
     end
 
