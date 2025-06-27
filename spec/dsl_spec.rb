@@ -299,4 +299,34 @@ RSpec.describe "ActiveRecord::Batch::Aggregation" do
       end.not_to exceed_query_limit(3)
     end
   end
+
+  describe "async aggregations" do
+    before do
+      @user = User.create!(name: "Async User", role: "author", verified: true)
+      5.times { |i| @user.posts.create!(title: "Post #{i}", score: (i + 1) * 10) }
+    end
+
+    it "supports async aggregation methods" do
+      expect do
+        users = User.where(id: @user.id).with_aggregations
+        user = users.first
+
+        # Get promises
+        posts_count_promise = user.posts.async_count
+        high_score_posts_count_promise = user.posts.high_score.async_count
+        score_sum_promise = user.posts.async_sum(:score)
+        score_avg_promise = user.posts.async_average(:score)
+        score_max_promise = user.posts.async_maximum(:score)
+        score_min_promise = user.posts.async_minimum(:score)
+
+        # Assert values from promises
+        expect(posts_count_promise.value).to eq(5)
+        expect(high_score_posts_count_promise.value).to eq(0) # score > 50
+        expect(score_sum_promise.value).to eq(150) # 10+20+30+40+50
+        expect(score_avg_promise.value.to_i).to eq(30) # 150 / 5
+        expect(score_max_promise.value).to eq(50)
+        expect(score_min_promise.value).to eq(10)
+      end.not_to exceed_query_limit(7) # 1 for user, 6 for aggregations
+    end
+  end
 end

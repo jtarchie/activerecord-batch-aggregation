@@ -9,9 +9,32 @@ module ActiveRecord
     module Aggregation
       class Error < StandardError; end
 
+      # A promise-like object for deferring aggregation loading.
+      class AsyncAggregationPromise
+        def initialize(loader, function, record, reflection, chain, column)
+          @loader = loader
+          @function = function
+          @record = record
+          @reflection = reflection
+          @chain = chain
+          @column = column
+          @loaded = false
+        end
+
+        def value
+          return @value if @loaded
+
+          @value = @loader.get_association_aggregation(@function, @record, @reflection, @chain, @column)
+          @loaded = true
+          @value
+        end
+      end
+
       # Proxy for lazily building a relation and delegating count to the loader
       class AggregationProxy
         AGGREGATION_FUNCTIONS = %i[count sum average maximum minimum].freeze
+        ASYNC_AGGREGATION_FUNCTIONS = AGGREGATION_FUNCTIONS.map { |f| :"async_#{f}" }.freeze
+        ALL_AGGREGATION_FUNCTIONS = (AGGREGATION_FUNCTIONS + ASYNC_AGGREGATION_FUNCTIONS).freeze
 
         def initialize(loader, record, reflection, chain = [])
           @loader = loader
@@ -25,13 +48,19 @@ module ActiveRecord
         end
 
         def respond_to_missing?(method_name, include_private = false)
-          AGGREGATION_FUNCTIONS.include?(method_name) || @reflection.klass.all.respond_to?(method_name, include_private) || super
+          ALL_AGGREGATION_FUNCTIONS.include?(method_name) || @reflection.klass.all.respond_to?(method_name, include_private) || super
         end
 
         def method_missing(method_name, *args, &block)
           if AGGREGATION_FUNCTIONS.include?(method_name)
             column = args.first || "*"
             return @loader.get_association_aggregation(method_name, @record, @reflection, @chain, column)
+          end
+
+          if ASYNC_AGGREGATION_FUNCTIONS.include?(method_name)
+            sync_method = method_name.to_s.delete_prefix("async_").to_sym
+            column = args.first || "*"
+            return AsyncAggregationPromise.new(@loader, sync_method, @record, @reflection, @chain, column)
           end
 
           chain_with(method_name, args, block)
