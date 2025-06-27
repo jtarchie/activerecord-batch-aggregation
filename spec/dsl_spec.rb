@@ -3,9 +3,9 @@
 require "active_record"
 require "rspec-sqlimit"
 require "spec_helper"
-require "active_record/batch/aggregation"
+require "active_record/eager/aggregation"
 
-RSpec.describe "ActiveRecord::Batch::Aggregation" do
+RSpec.describe "ActiveRecord::Eager::Aggregation" do
   before(:all) do
     ActiveRecord::Base.establish_connection({ adapter: "sqlite3", database: ":memory:" })
     ActiveRecord::Base.connection
@@ -126,7 +126,7 @@ RSpec.describe "ActiveRecord::Batch::Aggregation" do
 
     it "efficiently loads count aggregations for has_many associations" do
       expect do
-        users = User.with_aggregations.all
+        users = User.eager_aggregations.all
         expect(users.size).to eq(5)
 
         users.each do |user|
@@ -152,7 +152,7 @@ RSpec.describe "ActiveRecord::Batch::Aggregation" do
 
     it "respects base scope when loading aggregations" do
       expect do
-        users = User.active_authors.with_aggregations
+        users = User.active_authors.eager_aggregations
         expect(users.size).to eq(5)
 
         users.each do |user|
@@ -165,7 +165,7 @@ RSpec.describe "ActiveRecord::Batch::Aggregation" do
 
     it "handles chained scopes and conditions" do
       expect do
-        users = User.active_authors.with_aggregations.where("name LIKE ?", "%1%")
+        users = User.active_authors.eager_aggregations.where("name LIKE ?", "%1%")
 
         users.each do |user|
           expect(user.posts.published.count).to eq(2)
@@ -223,7 +223,7 @@ RSpec.describe "ActiveRecord::Batch::Aggregation" do
 
     it "handles has_many through associations" do
       expect do
-        users = User.active_authors.with_aggregations
+        users = User.active_authors.eager_aggregations
 
         users.each do |user|
           # Test different association paths
@@ -236,7 +236,7 @@ RSpec.describe "ActiveRecord::Batch::Aggregation" do
 
     it "handles various aggregation functions" do
       expect do
-        users = User.active_authors.with_aggregations
+        users = User.active_authors.eager_aggregations
 
         users.each do |user|
           # Count
@@ -258,7 +258,7 @@ RSpec.describe "ActiveRecord::Batch::Aggregation" do
 
     it "handles joins and complex conditions" do
       expect do
-        users = User.active_authors.with_aggregations
+        users = User.active_authors.eager_aggregations
 
         users.each do |user|
           featured_count = user.posts.joins(:post_categories).where(post_categories: { featured: true }).count
@@ -276,7 +276,7 @@ RSpec.describe "ActiveRecord::Batch::Aggregation" do
       User.create!(name: "Lonely User", role: "author", verified: true)
 
       expect do
-        users = User.active_authors.with_aggregations
+        users = User.active_authors.eager_aggregations
         users.each do |user|
           expect(user.posts.count).to eq(0)
           expect(user.categories.count).to eq(0)
@@ -290,7 +290,7 @@ RSpec.describe "ActiveRecord::Batch::Aggregation" do
       3.times { |i| user.posts.create!(title: "Post #{i}", score: (i + 1) * 10) }
 
       expect do
-        users = User.active_authors.with_aggregations
+        users = User.active_authors.eager_aggregations
         users.each do |user|
           # Test with custom SQL
           weighted_sum = user.posts.sum("score * 2")
@@ -308,7 +308,7 @@ RSpec.describe "ActiveRecord::Batch::Aggregation" do
 
     it "supports async aggregation methods" do
       expect do
-        users = User.where(id: @user.id).with_aggregations
+        users = User.where(id: @user.id).eager_aggregations
         user = users.first
 
         # Get promises
@@ -330,23 +330,23 @@ RSpec.describe "ActiveRecord::Batch::Aggregation" do
     end
   end
 
-  context "when used with with_aggregations" do
+  context "when used with eager_aggregations" do
     it "does not return records for non-aggregation calls" do
       user = User.create!
       user.posts.create!
 
-      user_with_aggregation = User.with_aggregations.find(user.id)
+      user_with_aggregation = User.eager_aggregations.find(user.id)
 
       posts_association = user_with_aggregation.posts
-      expect(posts_association).to be_a(ActiveRecord::Batch::Aggregation::AggregationProxy)
+      expect(posts_association).to be_a(ActiveRecord::Eager::Aggregation::AggregationProxy)
 
       result = posts_association.first
       expect(result).not_to be_a(Post)
-      expect(result).to be_a(ActiveRecord::Batch::Aggregation::AggregationProxy)
+      expect(result).to be_a(ActiveRecord::Eager::Aggregation::AggregationProxy)
 
       loaded_relation = posts_association.to_a
       expect(loaded_relation).not_to be_an(Array)
-      expect(loaded_relation).to be_a(ActiveRecord::Batch::Aggregation::AggregationProxy)
+      expect(loaded_relation).to be_a(ActiveRecord::Eager::Aggregation::AggregationProxy)
 
       user_without_aggregation = User.find(user.id)
 

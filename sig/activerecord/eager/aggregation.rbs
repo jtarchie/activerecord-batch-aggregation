@@ -1,12 +1,12 @@
 module ActiveRecord
-  module Batch
+  module Eager
     module Aggregation
       VERSION: String
 
       class Error < StandardError
       end
 
-      # A proxy object that intercepts method calls on associations to aggregate them in batches.
+      # A proxy object that intercepts method calls on associations to aggregate them in eageres.
       class AggregationProxy
         AGGREGATION_FUNCTIONS: Array[Symbol]
 
@@ -68,14 +68,14 @@ module ActiveRecord
                                            String | Symbol column) -> Hash[untyped, Numeric]
       end
 
-      # Extends ActiveRecord::Base with .with_aggregations
+      # Extends ActiveRecord::Base with .eager_aggregations
       module ModelMethods
-        def with_aggregations: () -> ::ActiveRecord::Relation[untyped, untyped]
+        def eager_aggregations: () -> ::ActiveRecord::Relation[untyped, untyped]
       end
 
-      # Includes with_aggregations in ActiveRecord::Relation
+      # Includes eager_aggregations in ActiveRecord::Relation
       module RelationMethods
-        def with_aggregations: () -> self
+        def eager_aggregations: () -> self
       end
 
       # Prepended to ActiveRecord::Relation to hook into query execution.

@@ -1,22 +1,22 @@
 # frozen_string_literal: true
 
-require_relative "lib/active_record/batch/aggregation/version"
+require_relative "lib/active_record/eager/aggregation/version"
 
 Gem::Specification.new do |spec|
-  spec.name = "activerecord-batch-aggregation"
-  spec.version = ActiveRecord::Batch::Aggregation::VERSION
+  spec.name = "activerecord-eager-aggregation"
+  spec.version = ActiveRecord::Eager::Aggregation::VERSION
   spec.authors = ["JT Archie"]
   spec.email = ["jtarchie@gmail.com"]
 
-  spec.summary = "Efficiently batch-load aggregations on ActiveRecord associations to avoid N+1 queries."
-  spec.description = "This gem provides a `with_aggregations` method for ActiveRecord relations. It allows you to preload aggregation results (like count, sum, average) for `has_many` and `has_many :through` associations, preventing the common N+1 query problem when calculating these values in a loop."
-  spec.homepage = "https://github.com/jtarchie/activerecord-batch-aggregation"
+  spec.summary = "Efficiently eager-load aggregations on ActiveRecord associations to avoid N+1 queries."
+  spec.description = "This gem provides a `eager_aggregations` method for ActiveRecord relations. It allows you to preload aggregation results (like count, sum, average) for `has_many` and `has_many :through` associations, preventing the common N+1 query problem when calculating these values in a loop."
+  spec.homepage = "https://github.com/jtarchie/activerecord-eager-aggregation"
   spec.license = "MIT"
   spec.required_ruby_version = ">= 3.3.0"
 
   spec.metadata["homepage_uri"] = spec.homepage
-  spec.metadata["source_code_uri"] = "https://github.com/jtarchie/activerecord-batch-aggregation"
-  spec.metadata["changelog_uri"] = "https://github.com/jtarchie/activerecord-batch-aggregation/blob/main/CHANGELOG.md"
+  spec.metadata["source_code_uri"] = "https://github.com/jtarchie/activerecord-eager-aggregation"
+  spec.metadata["changelog_uri"] = "https://github.com/jtarchie/activerecord-eager-aggregation/blob/main/CHANGELOG.md"
 
   # Specify which files should be added to the gem when it is released.
   # The `git ls-files -z` loads the files in the RubyGem that have been added into git.

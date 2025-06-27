@@ -5,7 +5,7 @@ require "active_support/lazy_load_hooks"
 require "active_record"
 
 module ActiveRecord
-  module Batch
+  module Eager
     module Aggregation
       class Error < StandardError; end
 
@@ -161,13 +161,13 @@ module ActiveRecord
       end
 
       module ModelMethods
-        def with_aggregations
-          all.with_aggregations
+        def eager_aggregations
+          all.eager_aggregations
         end
       end
 
       module RelationMethods
-        def with_aggregations
+        def eager_aggregations
           clone.tap { |relation| relation.instance_variable_set(:@perform_eager_aggregation, true) }
         end
       end
@@ -201,7 +201,7 @@ module ActiveRecord
 end
 
 ActiveSupport.on_load(:active_record) do
-  ActiveRecord::Base.extend(ActiveRecord::Batch::Aggregation::ModelMethods)
-  ActiveRecord::Relation.include(ActiveRecord::Batch::Aggregation::RelationMethods)
-  ActiveRecord::Relation.prepend(ActiveRecord::Batch::Aggregation::RelationExecution)
+  ActiveRecord::Base.extend(ActiveRecord::Eager::Aggregation::ModelMethods)
+  ActiveRecord::Relation.include(ActiveRecord::Eager::Aggregation::RelationMethods)
+  ActiveRecord::Relation.prepend(ActiveRecord::Eager::Aggregation::RelationExecution)
 end

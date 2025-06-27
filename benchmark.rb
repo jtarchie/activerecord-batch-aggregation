@@ -2,7 +2,7 @@
 
 require "benchmark/ips"
 require "benchmark/memory"
-require_relative "lib/active_record/batch/aggregation"
+require_relative "lib/active_record/eager/aggregation"
 
 # Establish connection and define schema within the script
 # to ensure it's self-contained.
@@ -53,9 +53,9 @@ Benchmark.ips do |x|
     users.each { |user| user.posts.count }
   end
 
-  x.report("with_aggregations") do
+  x.report("eager_aggregations") do
     # Preload users with aggregations enabled
-    users = User.with_aggregations.to_a
+    users = User.eager_aggregations.to_a
     users.each { |user| user.posts.count }
   end
 
@@ -69,8 +69,8 @@ Benchmark.memory do |x|
     users.each { |user| user.posts.count }
   end
 
-  x.report("with_aggregations memory") do
-    users = User.with_aggregations.to_a
+  x.report("eager_aggregations memory") do
+    users = User.eager_aggregations.to_a
     users.each { |user| user.posts.count }
   end
 

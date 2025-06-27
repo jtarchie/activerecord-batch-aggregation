@@ -2,7 +2,7 @@
 
 source "https://rubygems.org"
 
-# Specify your gem's dependencies in activerecord-batch-aggregation.gemspec
+# Specify your gem's dependencies in activerecord-eager-aggregation.gemspec
 gemspec
 
 gem "benchmark"
