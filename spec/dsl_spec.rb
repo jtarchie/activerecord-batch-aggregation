@@ -387,4 +387,25 @@ RSpec.describe "ActiveRecord::Eager::Aggregation" do
       end.not_to exceed_query_limit(4) # 3 batches + 1 aggregation query
     end
   end
+
+  context "with block-based aggregations" do
+    before do
+      2.times do |i|
+        user = User.create!(name: "Author #{i}", role: "author", verified: true)
+        3.times { |j| user.posts.create!(score: (j + 1) * 10) }
+      end
+    end
+
+    it "falls back to original sum and async_sum and causes N+1 queries" do
+      # This is expected to be inefficient, but functionally correct.
+      expect do
+        users = User.active_authors.eager_aggregations.to_a
+        users.each do |user|
+          # block-based sum loads the association
+          sum_in_ruby = user.posts.sum(&:score)
+          expect(sum_in_ruby).to eq(60) # 10 + 20 + 30
+        end
+      end.to exceed_query_limit(2) # 1 for users, 2 for posts (N=2)
+    end
+  end
 end

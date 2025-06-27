@@ -32,9 +32,9 @@ module ActiveRecord
 
       # Proxy for lazily building a relation and delegating count to the loader
       class AggregationProxy
-        AGGREGATION_FUNCTIONS = %i[count sum average maximum minimum].freeze
-        ASYNC_AGGREGATION_FUNCTIONS = AGGREGATION_FUNCTIONS.map { |f| :"async_#{f}" }.freeze
-        ALL_AGGREGATION_FUNCTIONS = (AGGREGATION_FUNCTIONS + ASYNC_AGGREGATION_FUNCTIONS).freeze
+        AGGREGATION_FUNCTIONS = %i[count average maximum minimum].freeze
+        ASYNC_AGGREGATION_FUNCTIONS = [:async_sum] + AGGREGATION_FUNCTIONS.map { |f| :"async_#{f}" }.freeze
+        ALL_AGGREGATION_FUNCTIONS = (AGGREGATION_FUNCTIONS + ASYNC_AGGREGATION_FUNCTIONS + %i[sum]).freeze
 
         def initialize(loader, record, reflection, chain = [])
           @loader = loader
@@ -45,6 +45,20 @@ module ActiveRecord
 
         def where(*args, &block)
           chain_with(:where, args, block)
+        end
+
+        def sum(initial_value_or_column = 0, &)
+          if block_given?
+            relation = @record.association(@reflection.name).scope
+            full_relation = @chain.inject(relation) do |rel, item|
+              rel.public_send(item[:method], *item[:args], &item[:block])
+            end
+            return full_relation.sum(initial_value_or_column, &)
+          end
+
+          raise ArgumentError, "You must pass a column to `sum` when using `eager_aggregation`." if initial_value_or_column.zero?
+
+          @loader.get_association_aggregation(:sum, @record, @reflection, @chain, initial_value_or_column)
         end
 
         def respond_to_missing?(method_name, include_private = false)
