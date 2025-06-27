@@ -367,58 +367,58 @@ RSpec.describe "DSL" do
     end.not_to exceed_query_limit(4)
   end
 
-    it "handles eager count with complex join conditions" do
-      user = User.create!(name: "Test User", role: "author", verified: true)
-      tech_cat = Category.create!(name: "Tech", active: true)
-      lifestyle_cat = Category.create!(name: "Lifestyle", active: false)
+  it "handles eager count with complex join conditions" do
+    user = User.create!(name: "Test User", role: "author", verified: true)
+    tech_cat = Category.create!(name: "Tech", active: true)
+    lifestyle_cat = Category.create!(name: "Lifestyle", active: false)
 
-      post1 = user.posts.create!(title: "Tech Post", status: "published")
-      post2 = user.posts.create!(title: "Life Post", status: "published")
+    post1 = user.posts.create!(title: "Tech Post", status: "published")
+    post2 = user.posts.create!(title: "Life Post", status: "published")
 
-      post1.post_categories.create!(category: tech_cat, featured: true)
-      post2.post_categories.create!(category: lifestyle_cat, featured: false)
+    post1.post_categories.create!(category: tech_cat, featured: true)
+    post2.post_categories.create!(category: lifestyle_cat, featured: false)
 
-      expect do
-        users = User.active_authors.eager
-        users.each do |user|
-          # Count through associations with conditions
-          active_categories = user.categories.active.count
-          featured_posts = user.posts.joins(:post_categories).where(post_categories: { featured: true }).count
+    expect do
+      users = User.active_authors.eager
+      users.each do |user|
+        # Count through associations with conditions
+        active_categories = user.categories.active.count
+        featured_posts = user.posts.joins(:post_categories).where(post_categories: { featured: true }).count
 
-          expect(active_categories).to eq(1)
-          expect(featured_posts).to eq(1)
-        end
-      end.not_to exceed_query_limit(4)
+        expect(active_categories).to eq(1)
+        expect(featured_posts).to eq(1)
+      end
+    end.not_to exceed_query_limit(4)
+  end
+
+  it "handles eager count with polymorphic or complex associations" do
+    # Test with comments (user has_many comments directly)
+    users = []
+    3.times do |i|
+      user = User.create!(name: "User #{i}", role: "author", verified: true)
+      users << user
+
+      # Create posts and comments
+      2.times do |j|
+        post = user.posts.create!(title: "Post #{j}")
+        # User comments on their own posts
+        ((j + 1) * 2).times { |k| post.comments.create!(content: "Comment #{k}", user: user, upvotes: k * 5) }
+      end
     end
 
-  #   it "handles eager count with polymorphic or complex associations" do
-  #     # Test with comments (user has_many comments directly)
-  #     users = []
-  #     3.times do |i|
-  #       user = User.create!(name: "User #{i}", role: "author", verified: true)
-  #       users << user
+    expect do
+      eager_users = User.active_authors.eager
+      eager_users.each do |user|
+        posts_count = user.posts.count
+        comments_count = user.comments.count
+        popular_comments = user.comments.popular.count
 
-  #       # Create posts and comments
-  #       2.times do |j|
-  #         post = user.posts.create!(title: "Post #{j}")
-  #         # User comments on their own posts
-  #         2.times { |k| post.comments.create!(content: "Comment #{k}", user: user, upvotes: k * 5) }
-  #       end
-  #     end
-
-  #     expect do
-  #       eager_users = User.active_authors.eager
-  #       eager_users.each do |user|
-  #         posts_count = user.posts.count
-  #         comments_count = user.comments.count
-  #         popular_comments = user.comments.popular.count
-
-  #         expect(posts_count).to eq(2)
-  #         expect(comments_count).to eq(4)
-  #         expect(popular_comments).to eq(2) # Comments with upvotes > 10
-  #       end
-  #     end.not_to exceed_query_limit(4)
-  #   end
+        expect(posts_count).to eq(2)
+        expect(comments_count).to eq(6)
+        expect(popular_comments).to eq(1) # Comments with upvotes > 10
+      end
+    end.not_to exceed_query_limit(4)
+  end
 
   #   it "handles eager count with order and limit on associations" do
   #     user = User.create!(name: "Test User", role: "author", verified: true)
