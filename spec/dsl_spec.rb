@@ -340,12 +340,10 @@ RSpec.describe "ActiveRecord::Batch::Aggregation" do
       posts_association = user_with_aggregation.posts
       expect(posts_association).to be_a(ActiveRecord::Batch::Aggregation::AggregationProxy)
 
-      # Calling a standard relation method like .first returns another proxy, not a Post
       result = posts_association.first
       expect(result).not_to be_a(Post)
       expect(result).to be_a(ActiveRecord::Batch::Aggregation::AggregationProxy)
 
-      # Attempting to treat it as a collection of records will not work as expected
       loaded_relation = posts_association.to_a
       expect(loaded_relation).not_to be_an(Array)
       expect(loaded_relation).to be_a(ActiveRecord::Batch::Aggregation::AggregationProxy)
@@ -355,11 +353,9 @@ RSpec.describe "ActiveRecord::Batch::Aggregation" do
       posts_association = user_without_aggregation.posts
       expect(posts_association).to be_a(ActiveRecord::Relation)
 
-      # Calling a standard relation method like .first returns another proxy, not a Post
       result = posts_association.first
       expect(result).to be_a(Post)
 
-      # Attempting to treat it as a collection of records will not work as expected
       loaded_relation = posts_association.to_a
       expect(loaded_relation).to be_an(Array)
     end
