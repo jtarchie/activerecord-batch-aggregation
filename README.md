@@ -18,7 +18,7 @@ If bundler is not being used to manage dependencies, install the gem by
 executing:
 
 ```bash
-gem install activerecord-eager-aggregation
+gem install "activerecord-eager-aggregation"
 ```
 
 ## Usage
