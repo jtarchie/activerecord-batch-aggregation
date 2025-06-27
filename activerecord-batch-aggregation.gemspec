@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-require_relative "lib/activerecord/batch/aggregation/version"
+require_relative "lib/active_record/batch/aggregation/version"
 
 Gem::Specification.new do |spec|
   spec.name = "activerecord-batch-aggregation"
@@ -8,17 +8,15 @@ Gem::Specification.new do |spec|
   spec.authors = ["JT Archie"]
   spec.email = ["jtarchie@gmail.com"]
 
-  spec.summary = "TODO: Write a short summary, because RubyGems requires one."
-  spec.description = "TODO: Write a longer description or delete this line."
-  spec.homepage = "TODO: Put your gem's website or public repo URL here."
+  spec.summary = "Efficiently batch-load aggregations on ActiveRecord associations to avoid N+1 queries."
+  spec.description = "This gem provides a `with_aggregations` method for ActiveRecord relations. It allows you to preload aggregation results (like count, sum, average) for `has_many` and `has_many :through` associations, preventing the common N+1 query problem when calculating these values in a loop."
+  spec.homepage = "https://github.com/jtarchie/activerecord-batch-aggregation"
   spec.license = "MIT"
   spec.required_ruby_version = ">= 3.3.0"
 
-  spec.metadata["allowed_push_host"] = "TODO: Set to your gem server 'https://example.com'"
-
   spec.metadata["homepage_uri"] = spec.homepage
-  spec.metadata["source_code_uri"] = "TODO: Put your gem's public repo URL here."
-  spec.metadata["changelog_uri"] = "TODO: Put your gem's CHANGELOG.md URL here."
+  spec.metadata["source_code_uri"] = "https://github.com/jtarchie/activerecord-batch-aggregation"
+  spec.metadata["changelog_uri"] = "https://github.com/jtarchie/activerecord-batch-aggregation/blob/main/CHANGELOG.md"
 
   # Specify which files should be added to the gem when it is released.
   # The `git ls-files -z` loads the files in the RubyGem that have been added into git.
