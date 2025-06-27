@@ -124,13 +124,13 @@ module ActiverecordBatch
     end
 
     module ModelMethods
-      def eager
-        all.eager
+      def with_aggregations
+        all.with_aggregations
       end
     end
 
     module RelationMethods
-      def eager
+      def with_aggregations
         clone.tap { |relation| relation.instance_variable_set(:@perform_eager_aggregation, true) }
       end
     end

@@ -118,7 +118,7 @@ RSpec.describe "DSL" do
     end
 
     expect do
-      scope = User.eager.all
+      scope = User.with_aggregations.all
       expect(scope.size).to eq(10)
 
       scope.each do |user|
@@ -134,7 +134,7 @@ RSpec.describe "DSL" do
     end
 
     expect do
-      scope = User.eager.where(age: 30..50)
+      scope = User.with_aggregations.where(age: 30..50)
       expect(scope.size).to eq(5) # Adjust based on created users' ages
 
       scope.each do |user|
@@ -150,7 +150,7 @@ RSpec.describe "DSL" do
     end
 
     expect do
-      users = User.eager.all
+      users = User.with_aggregations.all
       users.each do |user|
         even_posts_count = user.posts.where(title: "Even").count
         expect(even_posts_count).to eq(3)
@@ -173,7 +173,7 @@ RSpec.describe "DSL" do
     end
 
     expect do
-      users = User.active_authors.eager
+      users = User.active_authors.with_aggregations
       expect(users.size).to eq(5)
       users.each do |user|
         even_posts_count = user.posts.where(title: "Even").count
@@ -190,7 +190,7 @@ RSpec.describe "DSL" do
     end
 
     expect do
-      users = User.active_authors.eager
+      users = User.active_authors.with_aggregations
       expect(users.size).to eq(2) # No active authors created yet
 
       users.each do |user|
@@ -339,7 +339,7 @@ RSpec.describe "DSL" do
     end
 
     expect do
-      users = User.active_authors.eager.where(age: 25..28)
+      users = User.active_authors.with_aggregations.where(age: 25..28)
       users.each do |user|
         # Test multiple scoped counts
         published_count = user.posts.published.count
@@ -358,7 +358,7 @@ RSpec.describe "DSL" do
     3.times { |i| User.create!(name: "User #{i}", role: "author", verified: true) }
 
     expect do
-      users = User.active_authors.eager
+      users = User.active_authors.with_aggregations
       users.each do |user|
         expect(user.posts.count).to eq(0)
         expect(user.categories.count).to eq(0)
@@ -379,7 +379,7 @@ RSpec.describe "DSL" do
     post2.post_categories.create!(category: lifestyle_cat, featured: false)
 
     expect do
-      users = User.active_authors.eager
+      users = User.active_authors.with_aggregations
       users.each do |user|
         # Count through associations with conditions
         active_categories = user.categories.active.count
@@ -407,7 +407,7 @@ RSpec.describe "DSL" do
     end
 
     expect do
-      eager_users = User.active_authors.eager
+      eager_users = User.active_authors.with_aggregations
       eager_users.each do |user|
         posts_count = user.posts.count
         comments_count = user.comments.count
@@ -435,7 +435,7 @@ RSpec.describe "DSL" do
     end
 
     expect do
-      users = User.active_authors.eager
+      users = User.active_authors.with_aggregations
       users.each do |user|
         # Test that ordering doesn't break count
         total_posts = user.posts.count
@@ -458,7 +458,7 @@ RSpec.describe "DSL" do
     end
 
     expect do
-      users = User.active_authors.eager
+      users = User.active_authors.with_aggregations
       users.each do |user|
         # While testing count specifically, ensure other aggregations don't interfere
         posts_count = user.posts.count
@@ -489,7 +489,7 @@ RSpec.describe "DSL" do
     end
 
     expect do
-      users = User.active_authors.eager
+      users = User.active_authors.with_aggregations
       users.each do |user|
         # Count through different association paths
         posts_count = user.posts.count
@@ -511,7 +511,7 @@ RSpec.describe "DSL" do
     end
 
     expect do
-      users = User.active_authors.eager.where("age BETWEEN ? AND ?", 25, 27)
+      users = User.active_authors.with_aggregations.where("age BETWEEN ? AND ?", 25, 27)
       users.each do |user|
         # Test count with raw SQL conditions
         posts_count = user.posts.count
