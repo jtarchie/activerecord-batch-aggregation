@@ -353,19 +353,19 @@ RSpec.describe "DSL" do
     end.not_to exceed_query_limit(4) # May need one extra for complex scopes
   end
 
-  #   it "handles eager count with empty results" do
-  #     # Create users but no posts
-  #     3.times { |i| User.create!(name: "User #{i}", role: "author", verified: true) }
+  it "handles eager count with empty results" do
+    # Create users but no posts
+    3.times { |i| User.create!(name: "User #{i}", role: "author", verified: true) }
 
-  #     expect do
-  #       users = User.active_authors.eager
-  #       users.each do |user|
-  #         expect(user.posts.count).to eq(0)
-  #         expect(user.categories.count).to eq(0)
-  #         expect(user.comments.count).to eq(0)
-  #       end
-  #     end.not_to exceed_query_limit(3)
-  #   end
+    expect do
+      users = User.active_authors.eager
+      users.each do |user|
+        expect(user.posts.count).to eq(0)
+        expect(user.categories.count).to eq(0)
+        expect(user.comments.count).to eq(0)
+      end
+    end.not_to exceed_query_limit(4)
+  end
 
   #   it "handles eager count with complex join conditions" do
   #     user = User.create!(name: "Test User", role: "author", verified: true)
