@@ -100,6 +100,42 @@ release a new version, update the version number in `version.rb`, and then run
 git commits and the created tag, and push the `.gem` file to
 [rubygems.org](https://rubygems.org).
 
+## Benchmark
+
+Please see `benchmark.rb`. It is faster and uses less memory. Standard
+"benchmarks are not production" statement here.
+
+```
+Running IPS benchmark...
+ruby 3.4.4 (2025-05-14 revision a38531fd3f) +PRISM [arm64-darwin24]
+Warming up --------------------------------------
+     N+1 aggregation    11.000 i/100ms
+   with_aggregations   122.000 i/100ms
+Calculating -------------------------------------
+     N+1 aggregation    112.091 (± 0.9%) i/s    (8.92 ms/i) -    561.000 in   5.005053s
+   with_aggregations      1.245k (± 1.3%) i/s  (803.29 μs/i) -      6.344k in   5.096943s
+
+Comparison:
+   with_aggregations:     1244.9 i/s
+     N+1 aggregation:      112.1 i/s - 11.11x  slower
+
+
+Running Memory benchmark...
+Calculating -------------------------------------
+N+1 aggregation memory
+                         1.143M memsize (     0.000  retained)
+                        16.756k objects (     0.000  retained)
+                        50.000  strings (     0.000  retained)
+with_aggregations memory
+                       320.064k memsize (     0.000  retained)
+                         3.344k objects (     0.000  retained)
+                        50.000  strings (     0.000  retained)
+
+Comparison:
+with_aggregations memory:     320064 allocated
+N+1 aggregation memory:    1143208 allocated - 3.57x more
+```
+
 ## Contributing
 
 Bug reports and pull requests are welcome on GitHub at

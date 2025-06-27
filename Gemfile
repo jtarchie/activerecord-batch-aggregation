@@ -5,6 +5,9 @@ source "https://rubygems.org"
 # Specify your gem's dependencies in activerecord-batch-aggregation.gemspec
 gemspec
 
+gem "benchmark"
+gem "benchmark-ips"
+gem "benchmark-memory"
 gem "irb"
 gem "rake", "~> 13.0"
 gem "rspec"
