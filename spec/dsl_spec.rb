@@ -360,4 +360,31 @@ RSpec.describe "ActiveRecord::Eager::Aggregation" do
       expect(loaded_relation).to be_an(Array)
     end
   end
+
+  describe "batch loading with eager_aggregations" do
+    before do
+      10.times do |i|
+        user = User.create!(name: "Batch User #{i}", role: "author", verified: true)
+        3.times { |j| user.posts.create!(title: "Post #{j}") }
+      end
+    end
+
+    it "efficiently loads associations with find_in_batches" do
+      expect do
+        User.eager_aggregations.find_in_batches(batch_size: 5) do |batch|
+          batch.each do |user|
+            expect(user.posts.count).to eq(3)
+          end
+        end
+      end.not_to exceed_query_limit(5) # 2 batches + 2 aggregation queries + 1 for setup
+    end
+
+    it "efficiently loads associations with find_each" do
+      expect do
+        User.eager_aggregations.find_each(batch_size: 4) do |user|
+          expect(user.posts.count).to eq(3)
+        end
+      end.not_to exceed_query_limit(4) # 3 batches + 1 aggregation query
+    end
+  end
 end

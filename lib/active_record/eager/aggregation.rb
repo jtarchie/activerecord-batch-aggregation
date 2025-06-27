@@ -80,7 +80,7 @@ module ActiveRecord
           @relation = relation
           @records = records
           @loaded_data = {}
-          @primary_key = records.first.class.primary_key
+          @primary_key = (records.first&.class || relation.klass).primary_key
           @lock = Mutex.new
         end
 
@@ -172,6 +172,34 @@ module ActiveRecord
         end
       end
 
+      module BatchMethods
+        def find_each(start: nil, finish: nil, batch_size: 1000, error_on_ignore: nil, order: :asc, &block)
+          return super unless instance_variable_defined?(:@perform_eager_aggregation)
+          return to_enum(:find_each, start: start, finish: finish, batch_size: batch_size, error_on_ignore: error_on_ignore, order: order) unless block_given?
+
+          loader = AggregationLoader.new(self, [])
+          relation = clone
+          relation.remove_instance_variable(:@perform_eager_aggregation)
+
+          relation.find_in_batches(start: start, finish: finish, batch_size: batch_size, error_on_ignore: error_on_ignore, order: order) do |batch|
+            setup_eager_aggregation_on_batch(batch, loader)
+            batch.each(&block)
+          end
+        end
+
+        private
+
+        def setup_eager_aggregation_on_batch(records, loader)
+          has_many_associations = ->(record) { record.class.reflect_on_all_associations(:has_many) }
+
+          records.each do |record|
+            has_many_associations.call(record).each do |reflection|
+              record.define_singleton_method(reflection.name) { loader.proxy_for(record, reflection) }
+            end
+          end
+        end
+      end
+
       module RelationExecution
         private
 
@@ -203,5 +231,6 @@ end
 ActiveSupport.on_load(:active_record) do
   ActiveRecord::Base.extend(ActiveRecord::Eager::Aggregation::ModelMethods)
   ActiveRecord::Relation.include(ActiveRecord::Eager::Aggregation::RelationMethods)
+  ActiveRecord::Relation.prepend(ActiveRecord::Eager::Aggregation::BatchMethods)
   ActiveRecord::Relation.prepend(ActiveRecord::Eager::Aggregation::RelationExecution)
 end
