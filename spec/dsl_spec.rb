@@ -182,6 +182,24 @@ RSpec.describe "DSL" do
     end.not_to exceed_query_limit(3)
   end
 
+  it "handles has_many through associations with eager loading" do
+    3.times do |i|
+      user = User.create!(name: "User #{i}", role: "author", verified: i.even?)
+      category = Category.create!(name: "Category #{i}", active: i.odd?)
+      2.times { |j| category.posts << user.posts.create!(title: "Post #{j}") }
+    end
+
+    expect do
+      users = User.active_authors.eager
+      expect(users.size).to eq(2) # No active authors created yet
+
+      users.each do |user|
+        categories_count = user.categories.count
+        expect(categories_count).to eq(2) # Each user has 2 categories
+      end
+    end.not_to exceed_query_limit(3)
+  end
+
   it "does not break nested aggregations without eager" do
     # Create categories
     tech_category = Category.create!(name: "Technology", active: true)

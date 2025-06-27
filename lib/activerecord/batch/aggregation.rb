@@ -51,9 +51,27 @@ module ActiverecordBatch
 
       def load_association_count(reflection, conditions, cache_key)
         subquery = @relation.select(@primary_key)
-        query = reflection.klass.where(reflection.foreign_key => subquery)
-        query = query.where(conditions) if conditions.present?
-        @loaded_data[cache_key] = query.group(reflection.foreign_key).count
+        if reflection.options[:through]
+          through_reflection = reflection.through_reflection
+
+          join_reflection = reflection.klass.reflect_on_all_associations.find do |assoc|
+            assoc.klass == through_reflection.klass
+          end
+
+          raise "Could not find association from #{reflection.klass.name} to #{through_reflection.klass.name}" unless join_reflection
+
+          group_by_table = through_reflection.table_name
+          group_by_key = through_reflection.foreign_key
+
+          query = reflection.klass.joins(join_reflection.name)
+          query = query.where(group_by_table => { group_by_key => subquery })
+          query = query.where(conditions) if conditions.present?
+          @loaded_data[cache_key] = query.group("#{group_by_table}.#{group_by_key}").count
+        else
+          query = reflection.klass.where(reflection.foreign_key => subquery)
+          query = query.where(conditions) if conditions.present?
+          @loaded_data[cache_key] = query.group(reflection.foreign_key).count
+        end
       end
     end
 
@@ -91,7 +109,7 @@ module ActiverecordBatch
       end
 
       def has_many_associations(record)
-        record.class.reflect_on_all_associations(:has_many).reject { |r| r.options[:through] }
+        record.class.reflect_on_all_associations(:has_many)
       end
     end
   end
