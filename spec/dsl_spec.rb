@@ -329,4 +329,39 @@ RSpec.describe "ActiveRecord::Batch::Aggregation" do
       end.not_to exceed_query_limit(7) # 1 for user, 6 for aggregations
     end
   end
+
+  context "when used with with_aggregations" do
+    it "does not return records for non-aggregation calls" do
+      user = User.create!
+      user.posts.create!
+
+      user_with_aggregation = User.with_aggregations.find(user.id)
+
+      posts_association = user_with_aggregation.posts
+      expect(posts_association).to be_a(ActiveRecord::Batch::Aggregation::AggregationProxy)
+
+      # Calling a standard relation method like .first returns another proxy, not a Post
+      result = posts_association.first
+      expect(result).not_to be_a(Post)
+      expect(result).to be_a(ActiveRecord::Batch::Aggregation::AggregationProxy)
+
+      # Attempting to treat it as a collection of records will not work as expected
+      loaded_relation = posts_association.to_a
+      expect(loaded_relation).not_to be_an(Array)
+      expect(loaded_relation).to be_a(ActiveRecord::Batch::Aggregation::AggregationProxy)
+
+      user_without_aggregation = User.find(user.id)
+
+      posts_association = user_without_aggregation.posts
+      expect(posts_association).to be_a(ActiveRecord::Relation)
+
+      # Calling a standard relation method like .first returns another proxy, not a Post
+      result = posts_association.first
+      expect(result).to be_a(Post)
+
+      # Attempting to treat it as a collection of records will not work as expected
+      loaded_relation = posts_association.to_a
+      expect(loaded_relation).to be_an(Array)
+    end
+  end
 end
