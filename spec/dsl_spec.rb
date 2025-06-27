@@ -386,6 +386,38 @@ RSpec.describe "ActiveRecord::Eager::Aggregation" do
         end
       end.not_to exceed_query_limit(4) # 3 batches + 1 aggregation query
     end
+
+    context "with has_many :through associations" do
+      before do
+        # Create categories and associate them with posts
+        @categories = 3.times.map { |i| Category.create!(name: "Category #{i}") }
+
+        User.find_each do |user|
+          user.posts.each_with_index do |post, idx|
+            # Associate each post with a different category
+            post.post_categories.create!(category: @categories[idx % 3])
+          end
+        end
+      end
+
+      it "efficiently loads has_many :through associations with find_each" do
+        expect do
+          User.eager_aggregations.find_each(batch_size: 4) do |user|
+            expect(user.categories.count).to eq(3)
+          end
+        end.not_to exceed_query_limit(7) # 3 batches + aggregation queries
+      end
+
+      it "efficiently loads has_many :through associations with find_in_batches" do
+        expect do
+          User.eager_aggregations.find_in_batches(batch_size: 5) do |batch|
+            batch.each do |user|
+              expect(user.categories.count).to eq(3)
+            end
+          end
+        end.not_to exceed_query_limit(6) # 2 batches + aggregation queries
+      end
+    end
   end
 
   context "with block-based aggregations" do
