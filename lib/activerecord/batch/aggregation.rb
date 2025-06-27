@@ -10,6 +10,8 @@ module ActiverecordBatch
 
     # Proxy for lazily building a relation and delegating count to the loader
     class AggregationProxy
+      AGGREGATION_FUNCTIONS = %i[count sum average maximum minimum].freeze
+
       def initialize(loader, record, reflection, chain = [])
         @loader = loader
         @record = record
@@ -17,19 +19,20 @@ module ActiverecordBatch
         @chain = chain
       end
 
-      def count(*)
-        @loader.get_association_count(@record, @reflection, @chain)
-      end
-
       def where(*args, &block)
         chain_with(:where, args, block)
       end
 
       def respond_to_missing?(method_name, include_private = false)
-        @reflection.klass.all.respond_to?(method_name, include_private) || super
+        AGGREGATION_FUNCTIONS.include?(method_name) || @reflection.klass.all.respond_to?(method_name, include_private) || super
       end
 
       def method_missing(method_name, *args, &block)
+        if AGGREGATION_FUNCTIONS.include?(method_name)
+          column = args.first || "*"
+          return @loader.get_association_aggregation(method_name, @record, @reflection, @chain, column)
+        end
+
         chain_with(method_name, args, block)
       end
 
@@ -55,25 +58,33 @@ module ActiverecordBatch
         AggregationProxy.new(self, record, reflection)
       end
 
-      def get_association_count(record, reflection, chain)
-        cache_key = build_cache_key(reflection, chain)
+      def get_association_aggregation(function, record, reflection, chain, column)
+        cache_key = build_cache_key(reflection, chain, function, column)
 
         @lock.synchronize do
           @loaded_data[cache_key] ||= begin
             relation = build_relation(reflection, chain)
-            load_association_count(reflection, relation)
+            load_association_aggregation(function, reflection, relation, column)
           end
         end
 
         primary_key_value = record.public_send(@primary_key)
-        @loaded_data[cache_key][primary_key_value] || 0
+        result = @loaded_data[cache_key][primary_key_value]
+
+        if result.nil?
+          return 0 if %i[count sum].include?(function)
+
+          return
+        end
+
+        result
       end
 
       private
 
-      def build_cache_key(reflection, chain)
+      def build_cache_key(reflection, chain, function, column)
         key_chain = chain.map { |c| [c[:method], c[:args]] }
-        [reflection.name, key_chain].inspect
+        [reflection.name, key_chain, function, column].inspect
       end
 
       def build_relation(reflection, chain)
@@ -85,7 +96,7 @@ module ActiverecordBatch
         end
       end
 
-      def load_association_count(reflection, relation)
+      def load_association_aggregation(function, reflection, relation, column)
         subquery = @relation.select(@primary_key)
         if reflection.options[:through]
           through_reflection = reflection.through_reflection
@@ -102,12 +113,12 @@ module ActiverecordBatch
                             .where(group_by_table => { group_by_key => subquery })
                             .merge(relation)
 
-          query.group("#{group_by_table}.#{group_by_key}").count
+          query.group("#{group_by_table}.#{group_by_key}").public_send(function, column)
         else
           query = reflection.klass.where(reflection.foreign_key => subquery)
                             .merge(relation)
 
-          query.group(reflection.foreign_key).count
+          query.group(reflection.foreign_key).public_send(function, column)
         end
       end
     end
