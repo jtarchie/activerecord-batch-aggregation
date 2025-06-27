@@ -474,54 +474,54 @@ RSpec.describe "DSL" do
     end.not_to exceed_query_limit(5)
   end
 
-  #   it "handles eager count with multiple association paths" do
-  #     user = User.create!(name: "Test User", role: "author", verified: true)
-  #     category = Category.create!(name: "Test Category", active: true)
+  it "handles eager count with multiple association paths" do
+    user = User.create!(name: "Test User", role: "author", verified: true)
+    category = Category.create!(name: "Test Category", active: true)
 
-  #     # Create a post that belongs to category and has comments
-  #     post = user.posts.create!(title: "Test Post", status: "published")
-  #     post.post_categories.create!(category: category)
+    # Create a post that belongs to category and has comments
+    post = user.posts.create!(title: "Test Post", status: "published")
+    post.post_categories.create!(category: category)
 
-  #     # Other users comment on the post
-  #     2.times do |i|
-  #       commenter = User.create!(name: "Commenter #{i}")
-  #       post.comments.create!(content: "Comment #{i}", user: commenter)
-  #     end
+    # Other users comment on the post
+    2.times do |i|
+      commenter = User.create!(name: "Commenter #{i}")
+      post.comments.create!(content: "Comment #{i}", user: commenter)
+    end
 
-  #     expect do
-  #       users = User.active_authors.eager
-  #       users.each do |user|
-  #         # Count through different association paths
-  #         posts_count = user.posts.count
-  #         categories_count = user.categories.count
-  #         post_comments_count = user.posts.joins(:comments).count
+    expect do
+      users = User.active_authors.eager
+      users.each do |user|
+        # Count through different association paths
+        posts_count = user.posts.count
+        categories_count = user.categories.count
+        post_comments_count = user.posts.joins(:comments).count
 
-  #         expect(posts_count).to eq(1)
-  #         expect(categories_count).to eq(1)
-  #         expect(post_comments_count).to eq(2) # Post has 2 comments
-  #       end
-  #     end.not_to exceed_query_limit(4)
-  #   end
+        expect(posts_count).to eq(1)
+        expect(categories_count).to eq(1)
+        expect(post_comments_count).to eq(2) # Post has 2 comments
+      end
+    end.not_to exceed_query_limit(4)
+  end
 
-  #   it "handles eager count with custom SQL and raw conditions" do
-  #     3.times do |i|
-  #       user = User.create!(name: "User #{i}", role: "author", verified: true, age: 25 + i)
-  #       # Create posts with specific patterns for testing raw SQL
-  #       4.times { |j| user.posts.create!(title: "Post #{j}", score: j * 25) }
-  #     end
+  it "handles eager count with custom SQL and raw conditions" do
+    3.times do |i|
+      user = User.create!(name: "User #{i}", role: "author", verified: true, age: 25 + i)
+      # Create posts with specific patterns for testing raw SQL
+      4.times { |j| user.posts.create!(title: "Post #{j}", score: j * 25) }
+    end
 
-  #     expect do
-  #       users = User.active_authors.eager.where("age BETWEEN ? AND ?", 25, 27)
-  #       users.each do |user|
-  #         # Test count with raw SQL conditions
-  #         posts_count = user.posts.count
-  #         high_score_posts = user.posts.where("score > 50").count
-  #         title_pattern_posts = user.posts.where("title LIKE ?", "Post%").count
+    expect do
+      users = User.active_authors.eager.where("age BETWEEN ? AND ?", 25, 27)
+      users.each do |user|
+        # Test count with raw SQL conditions
+        posts_count = user.posts.count
+        high_score_posts = user.posts.where("score > 50").count
+        title_pattern_posts = user.posts.where("title LIKE ?", "Post%").count
 
-  #         expect(posts_count).to eq(4)
-  #         expect(high_score_posts).to eq(2)
-  #         expect(title_pattern_posts).to eq(4)
-  #       end
-  #     end.not_to exceed_query_limit(3)
-  #   end
+        expect(posts_count).to eq(4)
+        expect(high_score_posts).to eq(1)
+        expect(title_pattern_posts).to eq(4)
+      end
+    end.not_to exceed_query_limit(4)
+  end
 end
