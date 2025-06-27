@@ -373,25 +373,57 @@ RSpec.describe "DSL" do
     end.not_to exceed_query_limit(4)
   end
 
-  it "handles eager count with custom SQL and raw conditions" do
+  it "handles eager calculations with named columns" do
     3.times do |i|
-      user = User.create!(name: "User #{i}", role: "author", verified: true, age: 25 + i)
-      # Create posts with specific patterns for testing raw SQL
-      4.times { |j| user.posts.create!(title: "Post #{j}", score: j * 25) }
+      user = User.create!(name: "User #{i}", role: "author", verified: true, age: 25 + (i * 5))
+      # Create posts with varying scores
+      5.times { |j| user.posts.create!(title: "Post #{j}", score: (j + 1) * 10) }
     end
 
     expect do
-      users = User.active_authors.with_aggregations.where("age BETWEEN ? AND ?", 25, 27)
+      users = User.active_authors.with_aggregations
       users.each do |user|
-        # Test count with raw SQL conditions
-        posts_count = user.posts.count
-        high_score_posts = user.posts.where("score > 50").count
-        title_pattern_posts = user.posts.where("title LIKE ?", "Post%").count
+        # Test different calculation methods with column names
+        posts_count = user.posts.count(:id)
+        avg_score = user.posts.average(:score)
+        min_score = user.posts.minimum(:score)
+        max_score = user.posts.maximum(:score)
+        total_score = user.posts.sum(:score)
 
-        expect(posts_count).to eq(4)
-        expect(high_score_posts).to eq(1)
-        expect(title_pattern_posts).to eq(4)
+        expect(posts_count).to eq(5)
+        expect(avg_score).to eq(30.0) # (10+20+30+40+50)/5
+        expect(min_score).to eq(10)
+        expect(max_score).to eq(50)
+        expect(total_score).to eq(150)
       end
-    end.not_to exceed_query_limit(4)
+    end.not_to exceed_query_limit(6) # One query per calculation type
+  end
+
+  it "handles eager calculations with custom SQL expressions" do
+    2.times do |i|
+      user = User.create!(name: "User #{i}", role: "author", verified: true, age: 30 + i)
+      # Create posts with scores that relate to user age for testing custom expressions
+      3.times { |j| user.posts.create!(title: "Post #{j}", score: (j + 1) * user.age) }
+    end
+
+    expect do
+      users = User.active_authors.with_aggregations
+      users.each_with_index do |user, i|
+        # Test custom SQL calculations combining user and post data
+        posts_count = user.posts.count
+        score_age_sum = user.posts.sum("score + #{User.table_name}.age")
+        avg_score_ratio = user.posts.average("score / #{User.table_name}.age")
+
+        expect(posts_count).to eq(3)
+
+        # For user 0 (age 30): posts have scores 30, 60, 90
+        # score_age_sum = (30+30) + (60+30) + (90+30) = 60 + 90 + 120 = 270
+        # For user 1 (age 31): posts have scores 31, 62, 93
+        # score_age_sum = (31+31) + (62+31) + (93+31) = 62 + 93 + 124 = 279
+        expected_sum = i == 0 ? 270 : 279
+        expect(score_age_sum).to eq(expected_sum)
+        expect(avg_score_ratio).to eq(2.0) # All ratios are score/age = multiple/1 = 2.0
+      end
+    end.not_to exceed_query_limit(5)
   end
 end

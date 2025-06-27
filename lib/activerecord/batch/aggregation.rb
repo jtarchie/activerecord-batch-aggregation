@@ -109,13 +109,15 @@ module ActiverecordBatch
           group_by_table = through_reflection.table_name
           group_by_key = through_reflection.foreign_key
 
-          query = reflection.klass.joins(join_reflection.name)
+          joins_arg = { join_reflection.name => through_reflection.inverse_of.name }
+          query = reflection.klass.joins(joins_arg)
                             .where(group_by_table => { group_by_key => subquery })
                             .merge(relation)
 
           query.group("#{group_by_table}.#{group_by_key}").public_send(function, column)
         else
-          query = reflection.klass.where(reflection.foreign_key => subquery)
+          query = reflection.klass.joins(reflection.inverse_of.name)
+                            .where(reflection.foreign_key => subquery)
                             .merge(relation)
 
           query.group(reflection.foreign_key).public_send(function, column)
