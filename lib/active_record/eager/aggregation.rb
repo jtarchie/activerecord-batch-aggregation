@@ -56,8 +56,6 @@ module ActiveRecord
             return full_relation.sum(initial_value_or_column, &)
           end
 
-          raise ArgumentError, "You must pass a column to `sum` when using `eager_aggregation`." if initial_value_or_column.zero?
-
           @loader.get_association_aggregation(:sum, @record, @reflection, @chain, initial_value_or_column)
         end
 
