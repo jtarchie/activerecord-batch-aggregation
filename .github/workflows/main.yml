@@ -9,12 +9,14 @@ on:
 
 jobs:
   build:
+    env:
+      SKIP_DOCKER: true
     runs-on: ubuntu-latest
     name: Ruby ${{ matrix.ruby }}
     strategy:
       matrix:
         ruby:
-          - '3.4.4'
+          - "3.4.4"
 
     steps:
       - uses: actions/checkout@v4
@@ -25,3 +27,5 @@ jobs:
           bundler-cache: true
       - name: Run the default task
         run: bundle exec rake
+      - name: Run the test task
+        run: bundle exec rspec
