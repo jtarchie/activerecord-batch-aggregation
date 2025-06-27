@@ -3,7 +3,7 @@
 require "active_record"
 require "rspec-sqlimit"
 require "spec_helper"
-require_relative "../lib/activerecord/batch/aggregation"
+require "active_record/batch/aggregation"
 
 RSpec.describe "ActiveRecord::Batch::Aggregation" do
   before(:all) do
