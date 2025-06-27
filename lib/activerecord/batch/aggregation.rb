@@ -114,6 +114,11 @@ module ActiverecordBatch
                             .where(group_by_table => { group_by_key => subquery })
                             .merge(relation)
 
+          if function == :count
+            query = query.distinct
+            column = reflection.klass.primary_key if column == "*"
+          end
+
           query.group("#{group_by_table}.#{group_by_key}").public_send(function, column)
         else
           query = reflection.klass.joins(reflection.inverse_of.name)
