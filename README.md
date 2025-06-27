@@ -1,4 +1,4 @@
-# Activerecord::Batch::Aggregation
+# ActiveRecord::Batch::Aggregation
 
 ActiveRecord makes it easy to work with associations, but it can lead to performance issues when dealing with aggregations in a loop. For example, calling `user.posts.count` for each user in a list will trigger a separate database query for every user (an N+1 query problem). This gem solves this by allowing you to batch-load these aggregations in a constant number of queries.
 

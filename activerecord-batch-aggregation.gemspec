@@ -4,7 +4,7 @@ require_relative "lib/active_record/batch/aggregation/version"
 
 Gem::Specification.new do |spec|
   spec.name = "activerecord-batch-aggregation"
-  spec.version = Activerecord::Batch::Aggregation::VERSION
+  spec.version = ActiveRecord::Batch::Aggregation::VERSION
   spec.authors = ["JT Archie"]
   spec.email = ["jtarchie@gmail.com"]
 
