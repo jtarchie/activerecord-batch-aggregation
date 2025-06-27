@@ -367,29 +367,29 @@ RSpec.describe "DSL" do
     end.not_to exceed_query_limit(4)
   end
 
-  #   it "handles eager count with complex join conditions" do
-  #     user = User.create!(name: "Test User", role: "author", verified: true)
-  #     tech_cat = Category.create!(name: "Tech", active: true)
-  #     lifestyle_cat = Category.create!(name: "Lifestyle", active: false)
+    it "handles eager count with complex join conditions" do
+      user = User.create!(name: "Test User", role: "author", verified: true)
+      tech_cat = Category.create!(name: "Tech", active: true)
+      lifestyle_cat = Category.create!(name: "Lifestyle", active: false)
 
-  #     post1 = user.posts.create!(title: "Tech Post", status: "published")
-  #     post2 = user.posts.create!(title: "Life Post", status: "published")
+      post1 = user.posts.create!(title: "Tech Post", status: "published")
+      post2 = user.posts.create!(title: "Life Post", status: "published")
 
-  #     post1.post_categories.create!(category: tech_cat, featured: true)
-  #     post2.post_categories.create!(category: lifestyle_cat, featured: false)
+      post1.post_categories.create!(category: tech_cat, featured: true)
+      post2.post_categories.create!(category: lifestyle_cat, featured: false)
 
-  #     expect do
-  #       users = User.active_authors.eager
-  #       users.each do |user|
-  #         # Count through associations with conditions
-  #         active_categories = user.categories.active.count
-  #         featured_posts = user.posts.joins(:post_categories).where(post_categories: { featured: true }).count
+      expect do
+        users = User.active_authors.eager
+        users.each do |user|
+          # Count through associations with conditions
+          active_categories = user.categories.active.count
+          featured_posts = user.posts.joins(:post_categories).where(post_categories: { featured: true }).count
 
-  #         expect(active_categories).to eq(1)
-  #         expect(featured_posts).to eq(1)
-  #       end
-  #     end.not_to exceed_query_limit(4)
-  #   end
+          expect(active_categories).to eq(1)
+          expect(featured_posts).to eq(1)
+        end
+      end.not_to exceed_query_limit(4)
+    end
 
   #   it "handles eager count with polymorphic or complex associations" do
   #     # Test with comments (user has_many comments directly)
