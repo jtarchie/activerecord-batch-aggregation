@@ -8,22 +8,33 @@ module ActiverecordBatch
   module Aggregation
     class Error < StandardError; end
 
-    # Simple proxy that delegates count and where operations to preloaded data
+    # Simple proxy that lazily builds a relation and delegates count to the loader
     class AggregationProxy
-      def initialize(loader, record, reflection, conditions = {})
+      def initialize(loader, record, reflection, chain = [])
         @loader = loader
         @record = record
         @reflection = reflection
-        @conditions = conditions
+        @chain = chain
       end
 
       def count(*)
-        @loader.get_association_count(@record, @reflection, @conditions)
+        @loader.get_association_count(@record, @reflection, @chain)
       end
 
-      def where(conditions)
-        new_conditions = @conditions.merge(conditions)
-        self.class.new(@loader, @record, @reflection, new_conditions)
+      def where(*args)
+        new_chain = @chain + [{ method: :where, args: args, block: nil }]
+        self.class.new(@loader, @record, @reflection, new_chain)
+      end
+
+      def respond_to_missing?(method_name, include_private = false)
+        # Check if the base association class responds to the method.
+        @reflection.klass.all.respond_to?(method_name) || super
+      end
+
+      def method_missing(method_name, *args, &block)
+        # Assume any missing method is a scope or relation method and chain it.
+        new_chain = @chain + [{ method: method_name, args: args, block: block }]
+        self.class.new(@loader, @record, @reflection, new_chain)
       end
     end
 
@@ -39,9 +50,20 @@ module ActiverecordBatch
 
       def proxy_for(record, reflection) = AggregationProxy.new(self, record, reflection)
 
-      def get_association_count(record, reflection, conditions)
-        cache_key = [reflection.name, conditions.sort].inspect
-        @lock.synchronize { load_association_count(reflection, conditions, cache_key) unless @loaded_data.key?(cache_key) }
+      def get_association_count(record, reflection, chain)
+        # Create a cache key from the reflection and the chain of methods.
+        # Procs/blocks in the chain can't be reliably hashed, so we ignore them for the key.
+        key_chain = chain.map { |c| [c[:method], c[:args]] }
+        cache_key = [reflection.name, key_chain].inspect
+
+        @lock.synchronize do
+          unless @loaded_data.key?(cache_key)
+            # If cache miss, build the relation from the chain and load the counts for all records.
+            # This ensures dynamic scopes (like `1.month.ago`) are evaluated only once.
+            relation = build_relation(reflection, chain)
+            load_association_count(reflection, relation, cache_key)
+          end
+        end
 
         primary_key_value = record.public_send(@primary_key)
         @loaded_data.dig(cache_key, primary_key_value) || 0
@@ -49,7 +71,22 @@ module ActiverecordBatch
 
       private
 
-      def load_association_count(reflection, conditions, cache_key)
+      def build_relation(reflection, chain)
+        # Start with the base relation for the association's class.
+        relation = reflection.klass.all
+
+        # Apply the association's own scope if it exists.
+        relation = relation.instance_exec(&reflection.scope) if reflection.scope
+
+        # Apply all the chained methods (scopes, where clauses, etc.).
+        chain.each do |item|
+          relation = relation.public_send(item[:method], *item[:args], &item[:block])
+        end
+
+        relation
+      end
+
+      def load_association_count(reflection, relation, cache_key)
         subquery = @relation.select(@primary_key)
         if reflection.options[:through]
           through_reflection = reflection.through_reflection
@@ -65,11 +102,11 @@ module ActiverecordBatch
 
           query = reflection.klass.joins(join_reflection.name)
           query = query.where(group_by_table => { group_by_key => subquery })
-          query = query.where(conditions) if conditions.present?
+          query = query.merge(relation)
           @loaded_data[cache_key] = query.group("#{group_by_table}.#{group_by_key}").count
         else
           query = reflection.klass.where(reflection.foreign_key => subquery)
-          query = query.where(conditions) if conditions.present?
+          query = query.merge(relation)
           @loaded_data[cache_key] = query.group(reflection.foreign_key).count
         end
       end

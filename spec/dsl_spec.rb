@@ -329,4 +329,199 @@ RSpec.describe "DSL" do
       expect(high_score_posts).to be >= 0
     end
   end
+
+  it "handles eager count with nested scopes and conditions" do
+    5.times do |i|
+      user = User.create!(name: "User #{i}", role: "author", verified: true, age: 25 + i)
+      # Mix of published and draft posts with varying scores
+      4.times { |j| user.posts.create!(title: "Post #{j}", status: "published", score: j * 30, published_at: j.days.ago) }
+      2.times { |j| user.posts.create!(title: "Draft #{j}", status: "draft", score: 10) }
+    end
+
+    expect do
+      users = User.active_authors.eager.where(age: 25..28)
+      users.each do |user|
+        # Test multiple scoped counts
+        published_count = user.posts.published.count
+        high_score_count = user.posts.high_score.count
+        recent_count = user.posts.recent.count
+
+        expect(published_count).to eq(4)
+        expect(high_score_count).to eq(2) # scores 60, 90
+        expect(recent_count).to be >= 0
+      end
+    end.not_to exceed_query_limit(4) # May need one extra for complex scopes
+  end
+
+  #   it "handles eager count with empty results" do
+  #     # Create users but no posts
+  #     3.times { |i| User.create!(name: "User #{i}", role: "author", verified: true) }
+
+  #     expect do
+  #       users = User.active_authors.eager
+  #       users.each do |user|
+  #         expect(user.posts.count).to eq(0)
+  #         expect(user.categories.count).to eq(0)
+  #         expect(user.comments.count).to eq(0)
+  #       end
+  #     end.not_to exceed_query_limit(3)
+  #   end
+
+  #   it "handles eager count with complex join conditions" do
+  #     user = User.create!(name: "Test User", role: "author", verified: true)
+  #     tech_cat = Category.create!(name: "Tech", active: true)
+  #     lifestyle_cat = Category.create!(name: "Lifestyle", active: false)
+
+  #     post1 = user.posts.create!(title: "Tech Post", status: "published")
+  #     post2 = user.posts.create!(title: "Life Post", status: "published")
+
+  #     post1.post_categories.create!(category: tech_cat, featured: true)
+  #     post2.post_categories.create!(category: lifestyle_cat, featured: false)
+
+  #     expect do
+  #       users = User.active_authors.eager
+  #       users.each do |user|
+  #         # Count through associations with conditions
+  #         active_categories = user.categories.active.count
+  #         featured_posts = user.posts.joins(:post_categories).where(post_categories: { featured: true }).count
+
+  #         expect(active_categories).to eq(1)
+  #         expect(featured_posts).to eq(1)
+  #       end
+  #     end.not_to exceed_query_limit(4)
+  #   end
+
+  #   it "handles eager count with polymorphic or complex associations" do
+  #     # Test with comments (user has_many comments directly)
+  #     users = []
+  #     3.times do |i|
+  #       user = User.create!(name: "User #{i}", role: "author", verified: true)
+  #       users << user
+
+  #       # Create posts and comments
+  #       2.times do |j|
+  #         post = user.posts.create!(title: "Post #{j}")
+  #         # User comments on their own posts
+  #         2.times { |k| post.comments.create!(content: "Comment #{k}", user: user, upvotes: k * 5) }
+  #       end
+  #     end
+
+  #     expect do
+  #       eager_users = User.active_authors.eager
+  #       eager_users.each do |user|
+  #         posts_count = user.posts.count
+  #         comments_count = user.comments.count
+  #         popular_comments = user.comments.popular.count
+
+  #         expect(posts_count).to eq(2)
+  #         expect(comments_count).to eq(4)
+  #         expect(popular_comments).to eq(2) # Comments with upvotes > 10
+  #       end
+  #     end.not_to exceed_query_limit(4)
+  #   end
+
+  #   it "handles eager count with order and limit on associations" do
+  #     user = User.create!(name: "Test User", role: "author", verified: true)
+
+  #     # Create posts with different scores and dates
+  #     posts = []
+  #     5.times do |i|
+  #       posts << user.posts.create!(
+  #         title: "Post #{i}",
+  #         score: i * 20,
+  #         status: "published",
+  #         published_at: i.days.ago
+  #       )
+  #     end
+
+  #     expect do
+  #       users = User.active_authors.eager
+  #       users.each do |user|
+  #         # Test that ordering doesn't break count
+  #         total_posts = user.posts.count
+  #         recent_posts = user.posts.order(:published_at).count
+  #         high_score_posts = user.posts.order(score: :desc).where("score > ?", 40).count
+
+  #         expect(total_posts).to eq(5)
+  #         expect(recent_posts).to eq(5)
+  #         expect(high_score_posts).to eq(3)
+  #       end
+  #     end.not_to exceed_query_limit(3)
+  #   end
+
+  #   it "handles eager count with aggregation functions beyond count" do
+  #     user = User.create!(name: "Test User", role: "author", verified: true)
+
+  #     5.times do |i|
+  #       post = user.posts.create!(title: "Post #{i}", score: (i + 1) * 10, status: "published")
+  #       3.times { |j| post.comments.create!(content: "Comment #{j}", user: user, upvotes: j * 2) }
+  #     end
+
+  #     expect do
+  #       users = User.active_authors.eager
+  #       users.each do |user|
+  #         # While testing count specifically, ensure other aggregations don't interfere
+  #         posts_count = user.posts.count
+  #         total_score = user.posts.sum(:score)
+  #         avg_score = user.posts.average(:score)
+  #         max_score = user.posts.maximum(:score)
+
+  #         expect(posts_count).to eq(5)
+  #         expect(total_score).to eq(150) # 10+20+30+40+50
+  #         expect(avg_score).to eq(30.0)
+  #         expect(max_score).to eq(50)
+  #       end
+  #     end.not_to exceed_query_limit(3)
+  #   end
+
+  #   it "handles eager count with multiple association paths" do
+  #     user = User.create!(name: "Test User", role: "author", verified: true)
+  #     category = Category.create!(name: "Test Category", active: true)
+
+  #     # Create a post that belongs to category and has comments
+  #     post = user.posts.create!(title: "Test Post", status: "published")
+  #     post.post_categories.create!(category: category)
+
+  #     # Other users comment on the post
+  #     2.times do |i|
+  #       commenter = User.create!(name: "Commenter #{i}")
+  #       post.comments.create!(content: "Comment #{i}", user: commenter)
+  #     end
+
+  #     expect do
+  #       users = User.active_authors.eager
+  #       users.each do |user|
+  #         # Count through different association paths
+  #         posts_count = user.posts.count
+  #         categories_count = user.categories.count
+  #         post_comments_count = user.posts.joins(:comments).count
+
+  #         expect(posts_count).to eq(1)
+  #         expect(categories_count).to eq(1)
+  #         expect(post_comments_count).to eq(2) # Post has 2 comments
+  #       end
+  #     end.not_to exceed_query_limit(4)
+  #   end
+
+  #   it "handles eager count with custom SQL and raw conditions" do
+  #     3.times do |i|
+  #       user = User.create!(name: "User #{i}", role: "author", verified: true, age: 25 + i)
+  #       # Create posts with specific patterns for testing raw SQL
+  #       4.times { |j| user.posts.create!(title: "Post #{j}", score: j * 25) }
+  #     end
+
+  #     expect do
+  #       users = User.active_authors.eager.where("age BETWEEN ? AND ?", 25, 27)
+  #       users.each do |user|
+  #         # Test count with raw SQL conditions
+  #         posts_count = user.posts.count
+  #         high_score_posts = user.posts.where("score > 50").count
+  #         title_pattern_posts = user.posts.where("title LIKE ?", "Post%").count
+
+  #         expect(posts_count).to eq(4)
+  #         expect(high_score_posts).to eq(2)
+  #         expect(title_pattern_posts).to eq(4)
+  #       end
+  #     end.not_to exceed_query_limit(3)
+  #   end
 end
