@@ -88,6 +88,13 @@ users.each do |user|
 end
 ```
 
+<!-- deno-fmt-ignore-start -->
+> [!CAUTION]
+> Everything should Just Work™.
+> However, there may be an edge case of working with ActiveRecord scopes or relations that do not.
+> Please report a bug if anything related to the `Proxy` object causes an error.
+<!-- deno-fmt-ignore-end -->
+
 ## Development
 
 After checking out the repo, run `bin/setup` to install dependencies. You can
