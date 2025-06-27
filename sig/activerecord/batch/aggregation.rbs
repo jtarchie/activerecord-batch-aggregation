@@ -2,7 +2,92 @@ module ActiveRecord
   module Batch
     module Aggregation
       VERSION: String
-      # See the writing guide of rbs: https://github.com/ruby/rbs#guides
+
+      class Error < StandardError
+      end
+
+      # A proxy object that intercepts method calls on associations to aggregate them in batches.
+      class AggregationProxy
+        AGGREGATION_FUNCTIONS: Array[Symbol]
+
+        @loader: AggregationLoader
+        @record: ::ActiveRecord::Base
+        @reflection: ::ActiveRecord::Reflection::AssociationReflection
+        @chain: Array[chain_item]
+
+        type chain_item = { method: Symbol, args: Array[untyped], block: Proc? }
+
+        def initialize: (AggregationLoader loader,
+                         ::ActiveRecord::Base record,
+                         ::ActiveRecord::Reflection::AssociationReflection reflection,
+                         ?Array[chain_item] chain) -> void
+
+        def where: (*untyped args, ?Proc blk) -> AggregationProxy
+
+        def respond_to_missing?: (Symbol method_name, ?bool include_private) -> bool
+
+        # Handles aggregation functions like :count, :sum, etc., and chains other scope methods.
+        def method_missing: (Symbol method_name, *untyped args, ?Proc blk) -> (Numeric | AggregationProxy | nil)
+
+        private
+
+        def chain_with: (Symbol method, Array[untyped] args, Proc? block) -> AggregationProxy
+      end
+
+      # Loads and caches aggregated values for associations for a collection of records.
+      class AggregationLoader
+        @relation: ::ActiveRecord::Relation[untyped, untyped]
+        @records: Array[::ActiveRecord::Base]
+        @loaded_data: Hash[String, Hash[untyped, Numeric]]
+        @primary_key: String
+        @lock: Mutex
+
+        def initialize: (::ActiveRecord::Relation[untyped, untyped] relation, Array[::ActiveRecord::Base] records) -> void
+
+        def proxy_for: (::ActiveRecord::Base record, ::ActiveRecord::Reflection::AssociationReflection reflection) -> AggregationProxy
+
+        def get_association_aggregation: (Symbol function,
+                                          ::ActiveRecord::Base record,
+                                          ::ActiveRecord::Reflection::AssociationReflection reflection,
+                                          Array[AggregationProxy.chain_item] chain,
+                                          String | Symbol column) -> (Numeric | nil)
+
+        private
+
+        def build_cache_key: (::ActiveRecord::Reflection::AssociationReflection reflection,
+                              Array[AggregationProxy.chain_item] chain,
+                              Symbol function,
+                              String | Symbol column) -> String
+
+        def build_relation: (::ActiveRecord::Reflection::AssociationReflection reflection,
+                             Array[AggregationProxy.chain_item] chain) -> ::ActiveRecord::Relation[untyped, untyped]
+
+        def load_association_aggregation: (Symbol function,
+                                           ::ActiveRecord::Reflection::AssociationReflection reflection,
+                                           ::ActiveRecord::Relation[untyped, untyped] relation,
+                                           String | Symbol column) -> Hash[untyped, Numeric]
+      end
+
+      # Extends ActiveRecord::Base with .with_aggregations
+      module ModelMethods
+        def with_aggregations: () -> ::ActiveRecord::Relation[untyped, untyped]
+      end
+
+      # Includes with_aggregations in ActiveRecord::Relation
+      module RelationMethods
+        def with_aggregations: () -> self
+      end
+
+      # Prepended to ActiveRecord::Relation to hook into query execution.
+      module RelationExecution
+        private
+
+        def exec_queries: () -> Array[::ActiveRecord::Base]
+
+        def eager_aggregation_needed?: (Array[::ActiveRecord::Base] records) -> bool
+
+        def setup_eager_aggregation: (::ActiveRecord::Relation[untyped, untyped] relation, Array[::ActiveRecord::Base] records) -> void
+      end
     end
   end
 end
