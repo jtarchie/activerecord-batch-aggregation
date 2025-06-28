@@ -22,11 +22,9 @@ module ActiveRecord
         end
 
         def value
-          return @value if @loaded
+          return @value if defined?(@value)
 
           @value = @loader.get_association_aggregation(@function, @record, @reflection, @chain, @column)
-          @loaded = true
-          @value
         end
       end
 
@@ -126,7 +124,7 @@ module ActiveRecord
 
         def build_relation(reflection, chain)
           relation = reflection.klass.all
-          relation = relation.instance_exec(&reflection.scope) if reflection.scope
+          relation = relation.merge(reflection.scope) if reflection.scope
 
           chain.inject(relation) do |rel, item|
             rel.public_send(item[:method], *item[:args], &item[:block])
@@ -184,25 +182,27 @@ module ActiveRecord
           return super unless instance_variable_defined?(:@perform_eager_aggregation)
           return to_enum(:find_each, start: start, finish: finish, batch_size: batch_size, error_on_ignore: error_on_ignore, order: order, **kwargs) unless block_given?
 
-          relation = clone
-          relation.remove_instance_variable(:@perform_eager_aggregation)
-
-          relation.find_in_batches(start: start, finish: finish, batch_size: batch_size, error_on_ignore: error_on_ignore, order: order, **kwargs) do |batch|
-            setup_eager_aggregation(batch)
+          perform_in_batches(start: start, finish: finish, batch_size: batch_size, error_on_ignore: error_on_ignore, order: order, **kwargs) do |batch|
             batch.each(&block)
           end
         end
 
-        def find_in_batches(start: nil, finish: nil, batch_size: 1000, error_on_ignore: nil, order: :asc, **kwargs, &block)
+        def find_in_batches(start: nil, finish: nil, batch_size: 1000, error_on_ignore: nil, order: :asc, **, &)
           return super unless instance_variable_defined?(:@perform_eager_aggregation)
-          return to_enum(:find_in_batches, start: start, finish: finish, batch_size: batch_size, error_on_ignore: error_on_ignore, order: order, **kwargs) unless block_given?
+          return to_enum(:find_in_batches, start: start, finish: finish, batch_size: batch_size, error_on_ignore: error_on_ignore, order: order, **) unless block_given?
 
+          perform_in_batches(start: start, finish: finish, batch_size: batch_size, error_on_ignore: error_on_ignore, order: order, **, &)
+        end
+
+        private
+
+        def perform_in_batches(**options, &block)
           relation = clone
           relation.remove_instance_variable(:@perform_eager_aggregation)
 
-          relation.find_in_batches(start: start, finish: finish, batch_size: batch_size, error_on_ignore: error_on_ignore, order: order, **kwargs) do |batch|
+          relation.find_in_batches(**options) do |batch|
             setup_eager_aggregation(batch)
-            yield batch
+            block.call(batch)
           end
         end
       end
@@ -227,11 +227,14 @@ module ActiveRecord
 
         def setup_eager_aggregation(records)
           loader = AggregationLoader.new(records)
-          has_many_associations = ->(record) { record.class.reflect_on_all_associations(:has_many) }
+          model_class = records.first.class
+          has_many_reflections = model_class.reflect_on_all_associations(:has_many)
 
           records.each do |record|
-            has_many_associations.call(record).each do |reflection|
-              record.define_singleton_method(reflection.name) { loader.proxy_for(self, reflection) }
+            has_many_reflections.each do |reflection|
+              record.define_singleton_method(reflection.name) do
+                loader.proxy_for(self, reflection)
+              end
             end
           end
         end
