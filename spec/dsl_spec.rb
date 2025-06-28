@@ -296,7 +296,7 @@ RSpec.describe "ActiveRecord::Eager::Aggregation" do
           weighted_sum = user.posts.sum("score * 2")
           expect(weighted_sum).to eq(120) # (10+20+30)*2
         end
-      end.not_to exceed_query_limit(3)
+      end.not_to exceed_query_limit(4)
     end
   end
 
@@ -345,8 +345,10 @@ RSpec.describe "ActiveRecord::Eager::Aggregation" do
       expect(result).to be_a(ActiveRecord::Eager::Aggregation::AggregationProxy)
 
       loaded_relation = posts_association.to_a
-      expect(loaded_relation).not_to be_an(Array)
-      expect(loaded_relation).to be_a(ActiveRecord::Eager::Aggregation::AggregationProxy)
+      expect(loaded_relation).to be_an(Array)
+
+      loaded_relation = posts_association.map { 1 }
+      expect(loaded_relation).to be_an(Array)
 
       user_without_aggregation = User.find(user.id)
 

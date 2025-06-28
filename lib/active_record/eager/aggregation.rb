@@ -43,18 +43,20 @@ module ActiveRecord
           @chain = chain
         end
 
+        def map(&)
+          relation.map(&)
+        end
+
+        def to_a
+          relation.to_a
+        end
+
         def where(*args, &block)
           chain_with(:where, args, block)
         end
 
         def sum(initial_value_or_column = 0, &)
-          if block_given?
-            relation = @record.association(@reflection.name).scope
-            full_relation = @chain.inject(relation) do |rel, item|
-              rel.public_send(item[:method], *item[:args], &item[:block])
-            end
-            return full_relation.sum(initial_value_or_column, &)
-          end
+          return relation.sum(initial_value_or_column, &) if block_given?
 
           @loader.get_association_aggregation(:sum, @record, @reflection, @chain, initial_value_or_column)
         end
@@ -79,6 +81,13 @@ module ActiveRecord
         end
 
         private
+
+        def relation
+          base_relation = @record.association(@reflection.name).scope
+          @chain.inject(base_relation) do |rel, item|
+            rel.public_send(item[:method], *item[:args], &item[:block])
+          end
+        end
 
         def chain_with(method, args, block)
           new_chain = @chain + [{ method: method, args: args, block: block }]
