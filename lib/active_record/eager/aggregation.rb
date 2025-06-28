@@ -185,17 +185,31 @@ module ActiveRecord
       end
 
       module BatchMethods
-        def find_each(start: nil, finish: nil, batch_size: 1000, error_on_ignore: nil, order: :asc, &block)
+        def find_each(start: nil, finish: nil, batch_size: 1000, error_on_ignore: nil, order: :asc, **kwargs, &block)
           return super unless instance_variable_defined?(:@perform_eager_aggregation)
-          return to_enum(:find_each, start: start, finish: finish, batch_size: batch_size, error_on_ignore: error_on_ignore, order: order) unless block_given?
+          return to_enum(:find_each, start: start, finish: finish, batch_size: batch_size, error_on_ignore: error_on_ignore, order: order, **kwargs) unless block_given?
 
           loader = AggregationLoader.new(self, [])
           relation = clone
           relation.remove_instance_variable(:@perform_eager_aggregation)
 
-          relation.find_in_batches(start: start, finish: finish, batch_size: batch_size, error_on_ignore: error_on_ignore, order: order) do |batch|
+          relation.find_in_batches(start: start, finish: finish, batch_size: batch_size, error_on_ignore: error_on_ignore, order: order, **kwargs) do |batch|
             setup_eager_aggregation_on_batch(batch, loader)
             batch.each(&block)
+          end
+        end
+
+        def find_in_batches(start: nil, finish: nil, batch_size: 1000, error_on_ignore: nil, order: :asc, **kwargs, &block)
+          return super unless instance_variable_defined?(:@perform_eager_aggregation)
+          return to_enum(:find_in_batches, start: start, finish: finish, batch_size: batch_size, error_on_ignore: error_on_ignore, order: order, **kwargs) unless block_given?
+
+          loader = AggregationLoader.new(self, [])
+          relation = clone
+          relation.remove_instance_variable(:@perform_eager_aggregation)
+
+          relation.find_in_batches(start: start, finish: finish, batch_size: batch_size, error_on_ignore: error_on_ignore, order: order, **kwargs) do |batch|
+            setup_eager_aggregation_on_batch(batch, loader)
+            yield batch
           end
         end
 

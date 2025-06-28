@@ -369,6 +369,38 @@ RSpec.describe "ActiveRecord::Eager::Aggregation" do
       end
     end
 
+    it "supports eager loading from a single instance" do
+      expect do
+        user = User.first
+
+        user.posts.eager_aggregations.find_each(batch_size: 5) do |post|
+          expect(post.categories.count).to eq(0)
+        end
+      end.not_to exceed_query_limit(3)
+
+      expect do
+        user = User.first
+
+        user.posts.eager_aggregations.find_in_batches(batch_size: 5) do |posts|
+          posts.each do |post|
+            expect(post.categories.count).to eq(0)
+          end
+        end
+      end.not_to exceed_query_limit(3)
+
+      user_id = User.first.id
+
+      expect do
+        user = User.eager_aggregations.find(user_id)
+
+        user.posts.find_in_batches(batch_size: 5) do |posts|
+          posts.each do |post|
+            expect(post.categories.count).to eq(0)
+          end
+        end
+      end.not_to exceed_query_limit(3)
+    end
+
     it "efficiently loads associations with find_in_batches" do
       expect do
         User.eager_aggregations.find_in_batches(batch_size: 5) do |batch|
