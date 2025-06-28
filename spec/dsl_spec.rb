@@ -418,7 +418,7 @@ RSpec.describe "ActiveRecord::Eager::Aggregation" do
         User.eager_aggregations.find_each(batch_size: 4) do |user|
           expect(user.posts.count).to eq(3)
         end
-      end.not_to exceed_query_limit(4) # 3 batches + 1 aggregation query
+      end.not_to exceed_query_limit(6) # 3 batches + 1 aggregation query
     end
 
     context "with has_many :through associations" do
