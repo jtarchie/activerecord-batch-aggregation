@@ -330,6 +330,33 @@ RSpec.describe "ActiveRecord::Eager::Aggregation" do
     end
   end
 
+  describe "#exists?" do
+    let!(:user_with_posts) { User.create! }
+    let!(:user_without_posts) { User.create! }
+
+    before do
+      user_with_posts.posts.create!
+    end
+
+    it "efficiently checks for existence of associations" do
+      expect do
+        users = User.where(id: [user_with_posts.id, user_without_posts.id]).eager_aggregations.to_a
+        expect(users.find { |u| u.id == user_with_posts.id }.posts.exists?).to be true
+        expect(users.find { |u| u.id == user_without_posts.id }.posts.exists?).to be false
+      end.not_to exceed_query_limit(2) # 1 for users, 1 for exists? check
+    end
+
+    it "works with scopes" do
+      user_with_posts.posts.create!(status: "published")
+
+      expect do
+        users = User.where(id: user_with_posts.id).eager_aggregations.to_a
+        expect(users.first.posts.published.exists?).to be true
+        expect(users.first.posts.where(status: "archived").exists?).to be false
+      end.not_to exceed_query_limit(3) # 1 for user, 2 for exists? checks
+    end
+  end
+
   context "when used with eager_aggregations" do
     it "does not return records for non-aggregation calls" do
       user = User.create!

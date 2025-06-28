@@ -32,7 +32,7 @@ module ActiveRecord
       class AggregationProxy
         AGGREGATION_FUNCTIONS = %i[count average maximum minimum].freeze
         ASYNC_AGGREGATION_FUNCTIONS = [:async_sum] + AGGREGATION_FUNCTIONS.map { |f| :"async_#{f}" }.freeze
-        ALL_AGGREGATION_FUNCTIONS = (AGGREGATION_FUNCTIONS + ASYNC_AGGREGATION_FUNCTIONS + %i[sum]).freeze
+        ALL_AGGREGATION_FUNCTIONS = (AGGREGATION_FUNCTIONS + ASYNC_AGGREGATION_FUNCTIONS + %i[sum exists?]).freeze
 
         def initialize(loader, record, reflection, chain = [])
           @loader = loader
@@ -51,6 +51,10 @@ module ActiveRecord
 
         def where(*args, &block)
           chain_with(:where, args, block)
+        end
+
+        def exists?
+          @loader.get_association_aggregation(:exists, @record, @reflection, @chain, "*")
         end
 
         def sum(initial_value_or_column = 0, &)
@@ -111,6 +115,8 @@ module ActiveRecord
           primary_key_value = record.public_send(@primary_key)
           result = aggregation_results[primary_key_value]
 
+          return result.to_i > 0 if function == :exists
+
           if result.nil?
             return 0 if %i[count sum].include?(function)
 
@@ -154,11 +160,15 @@ module ActiveRecord
               column = reflection.klass.primary_key if column == "*"
             end
 
+            return query.group("#{group_by_table}.#{group_by_key}").count if function == :exists
+
             query.group("#{group_by_table}.#{group_by_key}").public_send(function, column)
           else
             query = reflection.klass.joins(reflection.inverse_of.name)
                               .where(reflection.foreign_key => subquery_pks)
                               .merge(relation)
+
+            return query.group(reflection.foreign_key).count if function == :exists
 
             query.group(reflection.foreign_key).public_send(function, column)
           end
