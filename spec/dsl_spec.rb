@@ -443,6 +443,8 @@ RSpec.describe "ActiveRecord::Eager::Aggregation" do
       end
 
       it "efficiently loads has_many :through associations with find_in_batches" do
+        User.first
+        User.first
         expect do
           User.eager_aggregations.find_in_batches(batch_size: 5) do |batch|
             batch.each do |user|

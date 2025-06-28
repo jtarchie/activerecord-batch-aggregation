@@ -99,7 +99,6 @@ module ActiveRecord
       class AggregationLoader
         def initialize(records)
           @records = records
-          @loaded_data = {}
           @primary_key = records.first.class.primary_key
         end
 
@@ -108,15 +107,11 @@ module ActiveRecord
         end
 
         def get_association_aggregation(function, record, reflection, chain, column)
-          cache_key = build_cache_key(reflection, chain, function, column)
-
-          @loaded_data[cache_key] ||= begin
-            relation = build_relation(reflection, chain)
-            load_association_aggregation(function, reflection, relation, column)
-          end
+          relation = build_relation(reflection, chain)
+          aggregation_results = load_association_aggregation(function, reflection, relation, column)
 
           primary_key_value = record.public_send(@primary_key)
-          result = @loaded_data[cache_key][primary_key_value]
+          result = aggregation_results[primary_key_value]
 
           if result.nil?
             return 0 if %i[count sum].include?(function)
@@ -128,11 +123,6 @@ module ActiveRecord
         end
 
         private
-
-        def build_cache_key(reflection, chain, function, column)
-          key_chain = chain.map { |c| [c[:method], c[:args]] }
-          [reflection.name, key_chain, function, column].inspect
-        end
 
         def build_relation(reflection, chain)
           relation = reflection.klass.all
@@ -222,7 +212,12 @@ module ActiveRecord
 
         def exec_queries
           records = super
-          setup_eager_aggregation(records) if eager_aggregation_needed?(records)
+          if eager_aggregation_needed?(records)
+            # Wrap in a cache block to enable ActiveRecord's query cache
+            records.first.class.connection.cache do
+              setup_eager_aggregation(records)
+            end
+          end
           records
         end
 

@@ -102,4 +102,18 @@ RSpec.configure do |config|
   #   Kernel.srand config.seed
 
   config.extend WithModel
+
+  if ENV["DEBUG"]
+    config.before do
+      ActiveRecord::Base.logger = Logger.new($stderr)
+      ActiveRecord::Base.logger.level = Logger::DEBUG
+    end
+  end
+
+  config.around do |example|
+    ActiveRecord::Base.connection.enable_query_cache!
+    example.run
+    ActiveRecord::Base.connection.clear_query_cache
+    ActiveRecord::Base.connection.disable_query_cache!
+  end
 end
