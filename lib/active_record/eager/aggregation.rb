@@ -3,11 +3,22 @@
 require_relative "aggregation/version"
 require "active_support/lazy_load_hooks"
 require "active_record"
+require "active_record/connection_adapters/abstract/query_cache"
 
 module ActiveRecord
   module Eager
     module Aggregation
       class Error < StandardError; end
+
+      module Cache
+        def self.cache
+          ActiveSupport::IsolatedExecutionState[:active_record_eager_aggregation_cache] ||= {}
+        end
+
+        def self.clear_cache
+          cache.clear
+        end
+      end
 
       # A promise-like object for deferring aggregation loading.
       class AsyncAggregationPromise
@@ -99,9 +110,21 @@ module ActiveRecord
 
       # Handles lazy loading of associations with thread safety
       class AggregationLoader
-        def initialize(records)
+        def initialize(records, cache)
           @records = records
           @primary_key = records.first.class.primary_key
+          @model_class = records.first.class
+          @subquery_pks = records.map { |record| record.public_send(@primary_key) }
+          @cache = cache
+        end
+
+        def self.new_from_pks(pks, model_class, cache)
+          loader = allocate
+          loader.instance_variable_set(:@subquery_pks, pks)
+          loader.instance_variable_set(:@primary_key, model_class.primary_key)
+          loader.instance_variable_set(:@model_class, model_class)
+          loader.instance_variable_set(:@cache, cache)
+          loader
         end
 
         def proxy_for(record, reflection)
@@ -109,8 +132,10 @@ module ActiveRecord
         end
 
         def get_association_aggregation(function, record, reflection, chain, column)
-          relation = build_relation(reflection, chain)
-          aggregation_results = load_association_aggregation(function, reflection, relation, column)
+          aggregation_results = @cache.fetch([function, reflection, chain, column]) do
+            relation = build_relation(reflection, chain)
+            @cache[[function, reflection, chain, column]] = load_association_aggregation(function, reflection, relation, column)
+          end
 
           primary_key_value = record.public_send(@primary_key)
 
@@ -139,7 +164,6 @@ module ActiveRecord
         end
 
         def load_association_aggregation(function, reflection, relation, column)
-          subquery_pks = @records.map { |record| record.public_send(@primary_key) }
           if reflection.options[:through]
             through_reflection = reflection.through_reflection
             join_reflection = reflection.klass.reflect_on_all_associations.find do |assoc|
@@ -153,7 +177,7 @@ module ActiveRecord
 
             joins_arg = { join_reflection.name => through_reflection.inverse_of.name }
             query = reflection.klass.joins(joins_arg)
-                              .where(group_by_table => { group_by_key => subquery_pks })
+                              .where(group_by_table => { group_by_key => @subquery_pks })
                               .merge(relation)
 
             return query.distinct.pluck("#{group_by_table}.#{group_by_key}") if function == :exists
@@ -166,7 +190,7 @@ module ActiveRecord
             query.group("#{group_by_table}.#{group_by_key}").public_send(function, column)
           else
             query = reflection.klass.joins(reflection.inverse_of.name)
-                              .where(reflection.foreign_key => subquery_pks)
+                              .where(reflection.foreign_key => @subquery_pks)
                               .merge(relation)
 
             return query.distinct.pluck(reflection.foreign_key) if function == :exists
@@ -211,8 +235,11 @@ module ActiveRecord
           relation = clone
           relation.remove_instance_variable(:@perform_eager_aggregation)
 
+          all_pks = relation.map(&relation.primary_key.to_sym)
+          loader = AggregationLoader.new_from_pks(all_pks, relation.klass, Cache.cache)
+
           relation.find_in_batches(**options) do |batch|
-            setup_eager_aggregation(batch)
+            setup_eager_aggregation(batch, loader)
             block.call(batch)
           end
         end
@@ -231,8 +258,8 @@ module ActiveRecord
           instance_variable_defined?(:@perform_eager_aggregation) && records.present? && records.first.class.connection.query_cache_enabled
         end
 
-        def setup_eager_aggregation(records)
-          loader = AggregationLoader.new(records)
+        def setup_eager_aggregation(records, loader = nil)
+          loader ||= AggregationLoader.new(records, Cache.cache)
           model_class = records.first.class
           has_many_reflections = model_class.reflect_on_all_associations(:has_many)
 
@@ -245,6 +272,13 @@ module ActiveRecord
           end
         end
       end
+
+      module QueryCacheExtension
+        def clear_query_cache
+          Cache.clear_cache
+          super
+        end
+      end
     end
   end
 end
@@ -254,4 +288,5 @@ ActiveSupport.on_load(:active_record) do
   ActiveRecord::Relation.include(ActiveRecord::Eager::Aggregation::RelationMethods)
   ActiveRecord::Relation.prepend(ActiveRecord::Eager::Aggregation::BatchMethods)
   ActiveRecord::Relation.prepend(ActiveRecord::Eager::Aggregation::RelationExecution)
+  ActiveRecord::ConnectionAdapters::AbstractAdapter.prepend(ActiveRecord::Eager::Aggregation::QueryCacheExtension)
 end

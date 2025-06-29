@@ -54,9 +54,12 @@ Benchmark.ips do |x|
   end
 
   x.report("eager_aggregations") do
+    ActiveRecord::Base.connection.enable_query_cache!
     # Preload users with aggregations enabled
     users = User.eager_aggregations.to_a
     users.each { |user| user.posts.count }
+    ActiveRecord::Base.connection.clear_query_cache
+    ActiveRecord::Base.connection.disable_query_cache!
   end
 
   x.compare!
@@ -65,13 +68,19 @@ end
 puts "\nRunning Memory benchmark..."
 Benchmark.memory do |x|
   x.report("N+1 aggregation memory") do
+    ActiveRecord::Base.connection.enable_query_cache!
     users = User.all.to_a
     users.each { |user| user.posts.count }
+    ActiveRecord::Base.connection.clear_query_cache
+    ActiveRecord::Base.connection.disable_query_cache!
   end
 
   x.report("eager_aggregations memory") do
+    ActiveRecord::Base.connection.enable_query_cache!
     users = User.eager_aggregations.to_a
     users.each { |user| user.posts.count }
+    ActiveRecord::Base.connection.clear_query_cache
+    ActiveRecord::Base.connection.disable_query_cache!
   end
 
   x.compare!
