@@ -113,9 +113,10 @@ module ActiveRecord
           aggregation_results = load_association_aggregation(function, reflection, relation, column)
 
           primary_key_value = record.public_send(@primary_key)
-          result = aggregation_results[primary_key_value]
 
-          return result.to_i > 0 if function == :exists
+          return aggregation_results.include?(primary_key_value) if function == :exists
+
+          result = aggregation_results[primary_key_value]
 
           if result.nil?
             return 0 if %i[count sum].include?(function)
@@ -155,12 +156,12 @@ module ActiveRecord
                               .where(group_by_table => { group_by_key => subquery_pks })
                               .merge(relation)
 
+            return query.distinct.pluck("#{group_by_table}.#{group_by_key}") if function == :exists
+
             if function == :count
               query = query.distinct
               column = reflection.klass.primary_key if column == "*"
             end
-
-            return query.group("#{group_by_table}.#{group_by_key}").count if function == :exists
 
             query.group("#{group_by_table}.#{group_by_key}").public_send(function, column)
           else
@@ -168,7 +169,7 @@ module ActiveRecord
                               .where(reflection.foreign_key => subquery_pks)
                               .merge(relation)
 
-            return query.group(reflection.foreign_key).count if function == :exists
+            return query.distinct.pluck(reflection.foreign_key) if function == :exists
 
             query.group(reflection.foreign_key).public_send(function, column)
           end
