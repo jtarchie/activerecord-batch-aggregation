@@ -223,17 +223,12 @@ module ActiveRecord
 
         def exec_queries
           records = super
-          if eager_aggregation_needed?(records)
-            # Wrap in a cache block to enable ActiveRecord's query cache
-            records.first.class.connection.cache do
-              setup_eager_aggregation(records)
-            end
-          end
+          setup_eager_aggregation(records) if eager_aggregation_needed?(records)
           records
         end
 
         def eager_aggregation_needed?(records)
-          instance_variable_defined?(:@perform_eager_aggregation) && records.present?
+          instance_variable_defined?(:@perform_eager_aggregation) && records.present? && records.first.class.connection.query_cache_enabled
         end
 
         def setup_eager_aggregation(records)

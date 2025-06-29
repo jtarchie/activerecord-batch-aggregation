@@ -503,4 +503,28 @@ RSpec.describe "ActiveRecord::Eager::Aggregation" do
       end.to exceed_query_limit(2) # 1 for users, 2 for posts (N=2)
     end
   end
+
+  context "when query cache is disabled" do
+    before do
+      2.times do |i|
+        user = User.create!(name: "User #{i}")
+        3.times { user.posts.create! }
+      end
+    end
+
+    it "falls back to standard ActiveRecord behavior" do
+      ActiveRecord::Base.connection.uncached do
+        expect do
+          users = User.eager_aggregations.to_a
+          users.each do |user|
+            expect(user.posts.count).to eq(3)
+          end
+        end.not_to exceed_query_limit(3)
+
+        user = User.eager_aggregations.first
+        expect(user.posts).to be_a(ActiveRecord::Relation)
+        expect(user.posts).not_to be_a(ActiveRecord::Eager::Aggregation::AggregationProxy)
+      end
+    end
+  end
 end
