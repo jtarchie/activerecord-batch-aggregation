@@ -435,6 +435,8 @@ RSpec.describe "ActiveRecord::Eager::Aggregation" do
         User.eager_aggregations.find_in_batches(batch_size: 5) do |batch|
           batch.each do |user|
             expect(user.posts.count).to eq(3)
+            # ensure cache is being used
+            expect(user.posts.count).to eq(3)
           end
         end
       end.not_to exceed_query_limit(5) # 2 batches + 2 aggregation queries + 1 for setup
