@@ -49,8 +49,11 @@ puts "Running IPS benchmark..."
 Benchmark.ips do |x|
   x.report("N+1 aggregation") do
     # Preload users to not measure the initial User.all query time
+    # ActiveRecord::Base.connection.enable_query_cache!
     users = User.all.to_a
     users.each { |user| user.posts.count }
+    ActiveRecord::Base.connection.clear_query_cache
+    ActiveRecord::Base.connection.disable_query_cache!
   end
 
   x.report("eager_aggregations") do

@@ -440,6 +440,15 @@ RSpec.describe "ActiveRecord::Eager::Aggregation" do
       end.not_to exceed_query_limit(5) # 2 batches + 2 aggregation queries + 1 for setup
     end
 
+    it "only loads the correct number of records with find_in_batches" do
+      User.eager_aggregations.find_in_batches(batch_size: 3) do |batch|
+        batch.each do |user|
+          expect { user.posts.count }.not_to exceed_query_limit(1).with(/#{Regexp.escape("(?, ?, ?)")}/)
+          break
+        end
+      end
+    end
+
     it "efficiently loads associations with find_each" do
       expect do
         User.eager_aggregations.find_each(batch_size: 4) do |user|

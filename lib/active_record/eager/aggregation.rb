@@ -235,10 +235,9 @@ module ActiveRecord
           relation = clone
           relation.remove_instance_variable(:@perform_eager_aggregation)
 
-          all_pks = relation.map(&relation.primary_key.to_sym)
-          loader = AggregationLoader.new_from_pks(all_pks, relation.klass, Cache.cache)
-
           relation.find_in_batches(**options) do |batch|
+            Cache.clear_cache
+            loader = AggregationLoader.new(batch, Cache.cache)
             setup_eager_aggregation(batch, loader)
             block.call(batch)
           end
